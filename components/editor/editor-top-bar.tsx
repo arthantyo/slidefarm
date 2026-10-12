@@ -6,7 +6,7 @@ import { useEditorStore } from "@/stores/editor-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useCustomTemplateStore } from "@/stores/custom-template-store";
 import { projectToCustomTemplate } from "@/lib/canvas/template-filler";
-import { saveEditorProject } from "@/lib/canvas/save-editor-project";
+import { editingTemplateId, saveEditorProject } from "@/lib/canvas/save-editor-project";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,11 +106,17 @@ export function EditorTopBar({ onOpenGenerator }: EditorTopBarProps) {
       : updatedTemplate);
     setIsSavingTemplate(false);
     if (!saved) return;
-    if (
+    if (editingTemplateId()) {
+      if (useEditorStore.getState().project?.name !== name) {
+        useEditorStore.getState().updateProjectName(name);
+      }
+      markClean();
+    } else if (
       (await saveProject(project)) &&
       useEditorStore.getState().project === project
-    )
+    ) {
       markClean();
+    }
     setTemplateDialogOpen(false);
   };
 

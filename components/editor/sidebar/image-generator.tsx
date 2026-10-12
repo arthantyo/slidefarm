@@ -92,8 +92,8 @@ export function ImageGenerator({ width, height, onAdd }: ImageGeneratorProps) {
         <div className="space-y-1 pt-2">
           <h4 className="text-xs font-medium text-muted-foreground">Saved prompts</h4>
           {savedPrompts.map((saved) => (
-            <div key={saved} className="flex items-start gap-1 rounded border border-border p-1">
-              <button className="min-w-0 flex-1 break-words px-1 text-left text-xs hover:text-primary" onClick={() => setPrompt(saved)} title="Use prompt">
+            <div key={saved} className="flex h-8 items-center gap-1 rounded border border-border px-1">
+              <button className="min-w-0 flex-1 truncate px-1 text-left text-xs hover:text-primary" onClick={() => setPrompt(saved)} title={saved}>
                 {saved}
               </button>
               <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => updateSavedPrompts(savedPrompts.filter((item) => item !== saved))} aria-label={`Delete saved prompt: ${saved}`}>

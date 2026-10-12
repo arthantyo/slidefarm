@@ -57,6 +57,20 @@ function fillSlides(slides: Slide[], data: TemplateData): Slide[] {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+/** Editor document for a template. Keeps the template id and slide content, and is not stored as a project. */
+export function projectFromTemplate(template: CustomTemplate): Project {
+  return {
+    id: template.id,
+    name: template.name,
+    dimensions: template.dimensions,
+    slides: JSON.parse(JSON.stringify(template.slides)) as Slide[],
+    theme: template.theme,
+    createdAt: template.createdAt,
+    updatedAt: Date.now(),
+    thumbnail: template.thumbnail ?? null,
+  };
+}
+
 /**
  * Create a new Project from a CustomTemplate (or any project acting as a template)
  * by substituting placeholder text values from `data`.
@@ -113,7 +127,7 @@ export function updateCustomTemplateFromProject(
   existing: CustomTemplate,
 ): CustomTemplate {
   return {
-    ...projectToCustomTemplate(project, existing.name, existing.description, existing.category),
+    ...projectToCustomTemplate(project, project.name, existing.description, existing.category),
     id: existing.id,
     createdAt: existing.createdAt,
   };

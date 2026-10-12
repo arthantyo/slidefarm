@@ -3,13 +3,15 @@ import { useProjectStore } from '@/stores/project-store';
 import { useCustomTemplateStore } from '@/stores/custom-template-store';
 import { updateCustomTemplateFromProject } from './template-filler';
 
-/** Save the working project and, when editing a template, its source template. */
-export async function saveEditorProject(project: Project): Promise<boolean> {
-  if (!await useProjectStore.getState().save(project)) return false;
-  if (typeof window === 'undefined') return true;
+export function editingTemplateId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get('editTemplate');
+}
 
-  const templateId = new URLSearchParams(window.location.search).get('editTemplate');
-  if (!templateId) return true;
+/** Save the open document. Template editing writes the template and does not create a project. */
+export async function saveEditorProject(project: Project): Promise<boolean> {
+  const templateId = editingTemplateId();
+  if (!templateId) return useProjectStore.getState().save(project);
 
   const templateStore = useCustomTemplateStore.getState();
   await templateStore.load();

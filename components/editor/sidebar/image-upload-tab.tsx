@@ -1,38 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Upload } from 'lucide-react';
-
-interface ImageUploadTabProps {
-  onAddImage: (url: string) => void;
-}
-
-export function ImageUrlInput({ onAdd }: { onAdd: (url: string) => void }) {
-  const [url, setUrl] = useState('');
-  return (
-    <div className="space-y-2">
-      <Input
-        placeholder="https://example.com/image.png"
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        className="text-xs"
-      />
-      <Button
-        size="sm"
-        className="w-full text-xs"
-        disabled={!url.trim()}
-        onClick={() => {
-          onAdd(url.trim());
-          setUrl('');
-        }}
-      >
-        Add Image to Slide
-      </Button>
-    </div>
-  );
-}
 
 export function FileUpload({ onUpload }: { onUpload: (dataUrl: string) => void }) {
   return (

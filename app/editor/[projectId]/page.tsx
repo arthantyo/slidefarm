@@ -4,7 +4,9 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useEditorStore } from '@/stores/editor-store';
 import { useProjectStore } from '@/stores/project-store';
-import { saveEditorProject } from '@/lib/canvas/save-editor-project';
+import { useCustomTemplateStore } from '@/stores/custom-template-store';
+import { projectFromTemplate } from '@/lib/canvas/template-filler';
+import { editingTemplateId, saveEditorProject } from '@/lib/canvas/save-editor-project';
 import { EditorTopBar } from '@/components/editor/editor-top-bar';
 import { LeftSidebar } from '@/components/editor/left-sidebar';
 import { RightSidebar } from '@/components/editor/right-sidebar';
@@ -22,14 +24,37 @@ export default function EditorPage() {
   const loaded = useProjectStore((s) => s.loaded);
   const [generatorOpen, setGeneratorOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const hydratedTemplateRef = useRef<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestProjectRef = useRef(project);
   const latestDirtyRef = useRef(useEditorStore.getState().isDirty);
   latestProjectRef.current = project;
   latestDirtyRef.current = useEditorStore.getState().isDirty;
 
-  // Load project from store
+  // Load a project, or the template being edited. Template editing never reads the project list.
   useEffect(() => {
+    const templateId = editingTemplateId();
+    if (templateId) {
+      if (hydratedTemplateRef.current === templateId) {
+        setIsLoading(false);
+        return;
+      }
+      let cancelled = false;
+      void (async () => {
+        const templateStore = useCustomTemplateStore.getState();
+        if (!templateStore.loaded) await templateStore.load();
+        if (cancelled) return;
+        const template = useCustomTemplateStore.getState().get(templateId);
+        const current = useEditorStore.getState().project;
+        if (template && current?.id !== template.id) loadProject(projectFromTemplate(template));
+        hydratedTemplateRef.current = templateId;
+        setIsLoading(false);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
+
     if (!loaded) {
       load();
       return;

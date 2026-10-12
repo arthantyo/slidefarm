@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useEditorStore } from '@/stores/editor-store';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,8 @@ import {
   Unlock,
   Eye,
   EyeOff,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import type {
   TextElement,
@@ -33,6 +35,7 @@ import { PositionSize } from './sidebar/position-size';
 import { CanvasProperties } from './sidebar/canvas-properties';
 
 export function RightSidebar() {
+  const [hidden, setHidden] = useState(false);
   const { project, currentSlideId, selectedElementIds } = useEditorStore();
   const {
     updateElement,
@@ -58,12 +61,43 @@ export function RightSidebar() {
   const canMoveBackward = layerIndex > 0;
   const canMoveForward = layerIndex >= 0 && layerIndex < contentElements.length - 1;
 
+  if (hidden) {
+    return (
+      <div className="flex w-10 shrink-0 flex-col items-center border-l border-border bg-card py-3">
+        <button
+          type="button"
+          onClick={() => setHidden(false)}
+          title="Show sidebar"
+          className="flex w-9 flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Show
+        </button>
+      </div>
+    );
+  }
+
+  const hideButton = (
+    <button
+      type="button"
+      onClick={() => setHidden(true)}
+      title="Hide sidebar"
+      aria-label="Hide sidebar"
+      className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+    >
+      <ChevronRight className="h-3.5 w-3.5" />
+    </button>
+  );
+
   // If no element selected, show Canvas settings
   if (!element) {
     return (
-      <div className="flex w-72 flex-col border-l border-border bg-card">
+      <div className="flex w-72 shrink-0 flex-col border-l border-border bg-card">
+        <div className="flex items-center justify-end px-2 pt-2">
+          {hideButton}
+        </div>
         <ScrollArea className="flex-1">
-          <div className="p-4">
+          <div className="p-4 pt-2">
             <CanvasProperties />
           </div>
         </ScrollArea>
@@ -74,7 +108,7 @@ export function RightSidebar() {
   const isBackground = element.type === 'background';
 
   return (
-    <div className="flex w-72 flex-col border-l border-border bg-card">
+    <div className="flex w-72 shrink-0 flex-col border-l border-border bg-card">
       <ScrollArea className="flex-1">
         <div className="space-y-4 p-4">
           {/* Header */}
@@ -103,6 +137,7 @@ export function RightSidebar() {
                   <EyeOff className="h-3.5 w-3.5" />
                 )}
               </button>
+              {hideButton}
             </div>
           </div>
 

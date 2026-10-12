@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 
 interface ReplaceImageDialogProps {
@@ -18,13 +18,14 @@ interface ReplaceImageDialogProps {
 }
 
 export function ReplaceImageDialog({ element, slideId, onClose, onRemixPendingChange }: ReplaceImageDialogProps) {
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState(element?.imagePrompt ?? '');
   const [isGenerating, setIsGenerating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const replaceImage = async () => {
     if (!element || prompt.trim().length < 3 || isGenerating) return;
+    const description = prompt.trim();
     setIsGenerating(true);
     setDialogOpen(false);
     onRemixPendingChange(true);
@@ -34,7 +35,7 @@ export function ReplaceImageDialog({ element, slideId, onClose, onRemixPendingCh
       if (!sourceResponse.ok) throw new Error('Could not load the original image.');
       const sourceImage = await sourceResponse.blob();
       const body = new FormData();
-      body.append('prompt', prompt.trim());
+      body.append('prompt', description);
       body.append('width', String(element.width));
       body.append('height', String(element.height));
       const extension = sourceImage.type.split('/')[1]?.split('+')[0] || 'png';
@@ -54,7 +55,7 @@ export function ReplaceImageDialog({ element, slideId, onClose, onRemixPendingCh
       store.updateSlide(slideId, (slide) => ({
         ...slide,
         elements: slide.elements.map((item) => item.id === element.id && item.type === 'image'
-          ? { ...item, src: result.src!, imagePrompt: prompt.trim() }
+          ? { ...item, src: result.src!, imagePrompt: description }
           : item),
       }));
       onClose();
@@ -69,26 +70,31 @@ export function ReplaceImageDialog({ element, slideId, onClose, onRemixPendingCh
 
   return (
     <Dialog open={!!element && dialogOpen} onOpenChange={(open) => { if (!open && !isGenerating) onClose(); }}>
-      <DialogContent>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Remix image</DialogTitle>
-          <DialogDescription>Describe the new image. The original guides its style only; the new subject has a transparent background.</DialogDescription>
+          <DialogTitle>Describe</DialogTitle>
         </DialogHeader>
         <div className="space-y-2">
-          <Label htmlFor="replacement-image-prompt">New image description</Label>
+          <Label htmlFor="replacement-image-prompt" className="sr-only">Describe</Label>
           <Textarea
             id="replacement-image-prompt"
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
-            placeholder="A red fox curled up asleep, in the original image's style..."
+            placeholder="Describe the new image..."
             maxLength={2000}
             disabled={isGenerating}
             autoFocus
+            className="min-h-[140px]"
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault();
+                void replaceImage();
+              }
+            }}
           />
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={replaceImage} disabled={prompt.trim().length < 3}>
             Remix image
           </Button>

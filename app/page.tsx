@@ -7,7 +7,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { useEditorStore } from "@/stores/editor-store";
 import { useCustomTemplateStore } from "@/stores/custom-template-store";
 import { createBlankProject, STARTER_TEMPLATES } from "@/lib/canvas/templates";
-import { fillTemplateFromData } from "@/lib/canvas/template-filler";
+import { fillTemplateFromData, projectFromTemplate } from "@/lib/canvas/template-filler";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { ProjectCard } from "@/components/dashboard/project-card";
 import { TemplateGallery } from "@/components/dashboard/template-gallery";
@@ -447,12 +447,10 @@ export default function DashboardPage() {
                 loadProject(project);
                 router.push(`/editor/${project.id}`);
               }}
-              onEditTemplate={async (template) => {
-                const project = fillTemplateFromData(template, {}, template.name);
-                if (!(await useProjectStore.getState().save(project))) return;
-                loadProject(project);
+              onEditTemplate={(template) => {
+                loadProject(projectFromTemplate(template));
                 router.push(
-                  `/editor/${project.id}?editTemplate=${encodeURIComponent(template.id)}`,
+                  `/editor/${template.id}?editTemplate=${encodeURIComponent(template.id)}`,
                 );
               }}
               onDeleteTemplate={(template) => useCustomTemplateStore.getState().delete(template.id)}

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import type { ShapeKind } from '@/types';
 import { FONT_OPTIONS, COLOR_PALETTE } from '@/lib/canvas/themes';
-import { ImageUrlInput, FileUpload } from './sidebar/image-upload-tab';
+import { FileUpload } from './sidebar/image-upload-tab';
 import { ImageGenerator } from './sidebar/image-generator';
 
 type Tab = 'text' | 'shapes' | 'images' | 'uploads' | 'ai' | 'templates';
@@ -216,9 +216,6 @@ export function LeftSidebar({ onOpenGenerator }: LeftSidebarProps) {
                     height={project.dimensions.height * 0.3}
                     onAdd={addGeneratedImage}
                   />
-                  <Separator />
-                  <p className="text-xs text-muted-foreground">Paste an image URL to add it to the canvas.</p>
-                  <ImageUrlInput onAdd={addImageByUrl} />
                 </div>
               )}
 

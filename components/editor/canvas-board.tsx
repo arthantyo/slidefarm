@@ -446,12 +446,19 @@ export function CanvasBoard({
         canvasHeight={height}
         zoom={zoom}
       />}
+
     </div>
       </ContextMenuTrigger>
-      <ContextMenuContent className="min-w-44">
+      <ContextMenuContent
+        className="min-w-44"
+        onCloseAutoFocus={(event) => event.preventDefault()}
+      >
         {contextElement?.type === 'image' && (
           <>
-            <ContextMenuItem onSelect={() => setReplacementImageId(contextElement.id)}>Remix image...</ContextMenuItem>
+            <ContextMenuItem onSelect={() => {
+              const imageId = contextElement.id;
+              window.setTimeout(() => setReplacementImageId(imageId), 0);
+            }}>Remix image...</ContextMenuItem>
             <ContextMenuSeparator />
           </>
         )}

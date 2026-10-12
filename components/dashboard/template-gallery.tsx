@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CustomTemplate, Template } from "@/types";
 import { STARTER_TEMPLATES } from "@/lib/canvas/templates";
 import { Card } from "@/components/ui/card";
@@ -27,7 +27,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { TemplateData } from "@/lib/canvas/template-filler";
-import { Pencil, Trash2 } from "lucide-react";
+import { LayoutGrid, List, Pencil, Trash2 } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+const TEMPLATE_VIEW_KEY = "slidefarm-template-view";
 
 interface TemplateGalleryProps {
   onUseTemplate: (template: Template) => void;
@@ -76,7 +79,18 @@ export function TemplateGallery({
   const [jsonValue, setJsonValue] = useState("{}");
   const [jsonError, setJsonError] = useState("");
   const [templateToDelete, setTemplateToDelete] = useState<CustomTemplate | null>(null);
+  const [layout, setLayout] = useState<"card" | "list">("card");
   const templates: Template[] = [...STARTER_TEMPLATES, ...customTemplates];
+
+  useEffect(() => {
+    const stored = localStorage.getItem(TEMPLATE_VIEW_KEY);
+    if (stored === "list" || stored === "card") setLayout(stored);
+  }, []);
+
+  const changeLayout = (view: "card" | "list") => {
+    setLayout(view);
+    localStorage.setItem(TEMPLATE_VIEW_KEY, view);
+  };
 
   const openFillDialog = (template: CustomTemplate) => {
     const placeholderCounts = getTextPlaceholderCounts(template);
@@ -138,13 +152,115 @@ export function TemplateGallery({
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="mb-5 flex items-center justify-end">
+        <ToggleGroup
+          type="single"
+          value={layout}
+          onValueChange={(value) => {
+            if (value === "card" || value === "list") changeLayout(value);
+          }}
+          variant="outline"
+          size="sm"
+          aria-label="Template view"
+        >
+          <ToggleGroupItem value="card" aria-label="Card view" title="Cards">
+            <LayoutGrid className="h-4 w-4" />
+          </ToggleGroupItem>
+          <ToggleGroupItem value="list" aria-label="List view" title="List">
+            <List className="h-4 w-4" />
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+      <div
+        className={
+          layout === "list"
+            ? "flex flex-col gap-2"
+            : "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        }
+      >
         {templates.map((template) => {
           const customTemplate = customTemplates.find(
             (item) => item.id === template.id,
           );
           const aspectRatio =
             template.dimensions.width / template.dimensions.height;
+          const category =
+            template.category || (customTemplate ? "Custom" : "Starter");
+          const actions = (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onUseTemplate(template)}
+              >
+                Use template
+              </Button>
+              {customTemplate && (
+                <Button size="sm" onClick={() => openFillDialog(customTemplate)}>
+                  Fill with JSON
+                </Button>
+              )}
+              {customTemplate && (
+                <>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="Edit template"
+                    aria-label={`Edit ${customTemplate.name}`}
+                    onClick={() => onEditTemplate(customTemplate)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="Delete template"
+                    aria-label={`Delete ${customTemplate.name}`}
+                    onClick={() => setTemplateToDelete(customTemplate)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </>
+          );
+
+          if (layout === "list") {
+            const thumbWidth = Math.max(48, Math.min(112, Math.round(72 * aspectRatio)));
+            return (
+              <Card
+                key={template.id}
+                className="flex flex-col gap-3 p-2 transition-all hover:border-primary/30 hover:shadow-md sm:flex-row sm:items-center sm:pr-3"
+              >
+                <div
+                  className="relative shrink-0 overflow-hidden rounded-md bg-muted"
+                  style={{ width: thumbWidth, height: 72 }}
+                >
+                  <SlidePreview
+                    slide={template.slides[0]}
+                    width={template.dimensions.width}
+                    height={template.dimensions.height}
+                    theme={template.theme}
+                  />
+                </div>
+                <div className="min-w-0 flex-1 px-1 sm:px-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="truncate text-sm font-semibold">{template.name}</h3>
+                    <Badge variant="secondary" className="shrink-0 text-xs">
+                      {category}
+                    </Badge>
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {template.description}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-1 px-1 sm:px-0">
+                  {actions}
+                </div>
+              </Card>
+            );
+          }
+
           return (
             <Card
               key={template.id}
@@ -167,14 +283,13 @@ export function TemplateGallery({
                     {template.name}
                   </h3>
                   <Badge variant="secondary" className="shrink-0 text-xs">
-                    {template.category ||
-                      (customTemplate ? "Custom" : "Starter")}
+                    {category}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                   {template.description}
                 </p>
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     size="sm"
                     variant="outline"
