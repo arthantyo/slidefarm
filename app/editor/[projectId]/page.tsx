@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useEditorStore } from '@/stores/editor-store';
 import { useProjectStore } from '@/stores/project-store';
+import { saveEditorProject } from '@/lib/canvas/save-editor-project';
 import { EditorTopBar } from '@/components/editor/editor-top-bar';
 import { LeftSidebar } from '@/components/editor/left-sidebar';
 import { RightSidebar } from '@/components/editor/right-sidebar';
@@ -42,10 +43,10 @@ export default function EditorPage() {
 
   // Autosave (debounced)
   useEffect(() => {
-    if (!project || !project.id) return;
+    if (!project || !project.id || !useEditorStore.getState().isDirty) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
-      const saved = await useProjectStore.getState().save(project);
+      const saved = await saveEditorProject(project);
       if (saved && latestProjectRef.current === project) {
         useEditorStore.getState().markClean();
       }
@@ -62,7 +63,7 @@ export default function EditorPage() {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
       const pendingProject = latestProjectRef.current;
-      void useProjectStore.getState().save(pendingProject).then((saved) => {
+      void saveEditorProject(pendingProject).then((saved) => {
         if (saved && useEditorStore.getState().project === pendingProject) {
           useEditorStore.getState().markClean();
         }
@@ -134,11 +135,10 @@ export default function EditorPage() {
       // Save
       if (cmd && e.key === 's') {
         e.preventDefault();
-        if (project) void useProjectStore.getState().save(project).then((saved) => {
-          if (saved && useEditorStore.getState().project === project) {
-            useEditorStore.getState().markClean();
-          }
-        });
+        if (project) void (async () => {
+          const saved = await saveEditorProject(project);
+          if (saved && useEditorStore.getState().project === project) useEditorStore.getState().markClean();
+        })();
         return;
       }
       // Escape — deselect

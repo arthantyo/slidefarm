@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import type { TextElement } from "@/types";
 import { loadFont } from "@/lib/font-loader";
 import { getTextFontWeight, isTextItalic } from "@/lib/canvas/text-style";
@@ -8,22 +8,43 @@ import { getTextFontWeight, isTextItalic } from "@/lib/canvas/text-style";
 interface TextRendererProps {
   element: TextElement;
   isSelected: boolean;
+  isEditing: boolean;
+  onEditStart: () => void;
+  onEditEnd: () => void;
   onUpdate: (updates: Partial<TextElement>) => void;
 }
 
 export function TextRenderer({
   element,
   isSelected,
+  isEditing,
+  onEditStart,
+  onEditEnd,
   onUpdate,
 }: TextRendererProps) {
-  const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(element.text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editTextRef = useRef(editText);
+  const onUpdateRef = useRef(onUpdate);
+  const committedTextRef = useRef(element.text);
+  const blurTimerRef = useRef<number | null>(null);
+  const unmountingRef = useRef(false);
   const { fontFamily, fontStyle, fontWeight } = element;
 
+  editTextRef.current = editText;
+  onUpdateRef.current = onUpdate;
+
+  useLayoutEffect(() => {
+    unmountingRef.current = false;
+    return () => {
+      unmountingRef.current = true;
+      if (blurTimerRef.current !== null) window.clearTimeout(blurTimerRef.current);
+    };
+  }, []);
+
   useEffect(() => {
-    setEditText(element.text);
-  }, [element.text]);
+    if (!isEditing) setEditText(element.text);
+  }, [element.text, isEditing]);
 
   useEffect(() => {
     void loadFont(
@@ -34,17 +55,33 @@ export function TextRenderer({
   }, [fontFamily, fontStyle, fontWeight]);
 
   useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      textareaRef.current.focus();
-      textareaRef.current.select();
-    }
+    if (!isEditing) return;
+    committedTextRef.current = element.text;
+    const el = textareaRef.current;
+    const focusId = window.setTimeout(() => {
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(0, el.value.length);
+    }, 0);
+    return () => {
+      window.clearTimeout(focusId);
+      const next = editTextRef.current;
+      if (next === committedTextRef.current) return;
+      committedTextRef.current = next;
+      onUpdateRef.current({ text: next });
+    };
+    // Capture the text from when this edit session opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing]);
 
-  const handleFinishEditing = () => {
-    setIsEditing(false);
-    if (editText !== element.text) {
-      onUpdate({ text: editText });
+  const finishEditing = () => {
+    if (unmountingRef.current) return;
+    const next = editTextRef.current;
+    if (next !== committedTextRef.current) {
+      committedTextRef.current = next;
+      onUpdate({ text: next });
     }
+    onEditEnd();
   };
 
   const shadowCss = element.shadow
@@ -81,14 +118,28 @@ export function TextRenderer({
           ref={textareaRef}
           value={editText}
           onChange={(e) => setEditText(e.target.value)}
-          onBlur={handleFinishEditing}
+          onPointerDown={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => {
+            e.preventDefault();
+            e.currentTarget.setSelectionRange(0, e.currentTarget.value.length);
+          }}
+          onBlur={() => {
+            if (unmountingRef.current) return;
+            blurTimerRef.current = window.setTimeout(() => {
+              blurTimerRef.current = null;
+              if (unmountingRef.current) return;
+              if (!textareaRef.current?.isConnected) return;
+              if (document.activeElement === textareaRef.current) return;
+              finishEditing();
+            }, 0);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.stopPropagation();
-              handleFinishEditing();
+              finishEditing();
             }
           }}
-          className="h-full w-full resize-none border-none bg-transparent outline-none ring-0 selection:bg-primary/30"
+          className="h-full w-full cursor-text resize-none select-text border-none bg-transparent outline-none ring-0 selection:bg-primary/30"
           style={style}
           autoFocus
         />
@@ -100,9 +151,7 @@ export function TextRenderer({
     <div
       onDoubleClick={(e) => {
         e.stopPropagation();
-        if (!element.locked) {
-          setIsEditing(true);
-        }
+        if (!element.locked) onEditStart();
       }}
       className={`flex h-full w-full select-none overflow-hidden ${verticalAlignClass}`}
       style={{

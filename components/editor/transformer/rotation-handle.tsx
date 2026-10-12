@@ -10,7 +10,7 @@ interface RotationHandleProps {
 export function RotationHandle({ onPointerDown }: RotationHandleProps) {
   return (
     <div
-      className="absolute left-1/2 -top-8 flex -translate-x-1/2 flex-col items-center"
+      className="pointer-events-auto absolute left-1/2 -top-8 flex -translate-x-1/2 flex-col items-center"
       style={{ touchAction: 'none' }}
     >
       <div

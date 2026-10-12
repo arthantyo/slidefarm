@@ -1,15 +1,24 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import type { Slide, CanvasElement, BackgroundElement } from '@/types';
 import type { GuideLine } from '@/lib/canvas/snapping';
 import { calculateSnapping } from '@/lib/canvas/snapping';
 import { BackgroundRenderer } from './elements/background-renderer';
 import { ElementWrapper } from './elements/element-wrapper';
 import { ElementTransformer } from './transformer/element-transformer';
+import { ReplaceImageDialog } from './replace-image-dialog';
 import { GuideLinesOverlay } from './guides/guide-lines-overlay';
 import { CanvasResizeHandles } from './canvas-size/canvas-resize-handles';
 import { DragIndicatorHUD } from './indicators/drag-indicator-hud';
+import { useEditorStore } from '@/stores/editor-store';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 
 interface CanvasBoardProps {
   slide: Slide;
@@ -19,6 +28,7 @@ interface CanvasBoardProps {
   selectedElementIds: string[];
   guides: GuideLine[];
   showGrid: boolean;
+  selectionEnabled: boolean;
   onSelectElement: (id: string | null, addToSelection?: boolean) => void;
   onUpdateElement: (id: string, updates: Partial<CanvasElement>) => void;
   onMoveSelectedElements?: (dx: number, dy: number) => void;
@@ -41,13 +51,21 @@ export function CanvasBoard({
   selectedElementIds,
   guides,
   showGrid,
+  selectionEnabled,
   onSelectElement,
   onUpdateElement,
   onMoveSelectedElements,
   setGuides,
 }: CanvasBoardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
+  const selectionEnabledRef = useRef(selectionEnabled);
+  selectionEnabledRef.current = selectionEnabled;
   const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
+  const [contextElementId, setContextElementId] = useState<string | null>(null);
+  const [replacementImageId, setReplacementImageId] = useState<string | null>(null);
+  const [remixingImageId, setRemixingImageId] = useState<string | null>(null);
+  const [editingElementId, setEditingElementId] = useState<string | null>(null);
+  const lastTextClickRef = useRef<{ id: string; time: number; x: number; y: number } | null>(null);
   const [multiDragIndicator, setMultiDragIndicator] = useState<{
     x: number;
     y: number;
@@ -55,15 +73,87 @@ export function CanvasBoard({
     snapLabelY?: string;
   } | null>(null);
 
+  useEffect(() => {
+    if (!selectionEnabled) {
+      setSelectionBox(null);
+      setEditingElementId(null);
+      setMultiDragIndicator(null);
+    }
+  }, [selectionEnabled]);
+
+  const handleTextPointerDown = useCallback((element: CanvasElement, event: React.PointerEvent) => {
+    if (element.type !== 'text' || element.locked || event.button !== 0) return false;
+    const now = performance.now();
+    const last = lastTextClickRef.current;
+    const isDoubleClick =
+      !!last &&
+      last.id === element.id &&
+      now - last.time <= 500 &&
+      Math.hypot(event.clientX - last.x, event.clientY - last.y) <= 8;
+    if (isDoubleClick) {
+      lastTextClickRef.current = null;
+      // Keep the gesture from moving focus, so the editor can take it after this click.
+      event.preventDefault();
+      const stopClick = (clickEvent: MouseEvent) => {
+        clickEvent.preventDefault();
+        clickEvent.stopPropagation();
+        window.removeEventListener('click', stopClick, true);
+      };
+      window.addEventListener('click', stopClick, true);
+      setEditingElementId(element.id);
+      return true;
+    }
+    lastTextClickRef.current = {
+      id: element.id,
+      time: now,
+      x: event.clientX,
+      y: event.clientY,
+    };
+    return false;
+  }, []);
+
+  useEffect(() => {
+    if (!editingElementId) return;
+    const element = slide.elements.find((el) => el.id === editingElementId);
+    if (!element || element.type !== 'text' || element.locked || !selectedElementIds.includes(editingElementId)) {
+      setEditingElementId(null);
+    }
+  }, [editingElementId, selectedElementIds, slide.elements]);
+
   const background = slide.elements.find((el) => el.type === 'background') as
     | BackgroundElement
     | undefined;
 
   const otherElements = slide.elements.filter((el) => el.type !== 'background');
+  const contextElement = otherElements.find((element) => element.id === contextElementId);
+  const contextLayerIndex = otherElements.findIndex((element) => element.id === contextElementId);
+  const replacementImage = otherElements.find((element) => element.id === replacementImageId);
+
+  const handleObjectContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target instanceof Element
+      ? event.target.closest<HTMLElement>('[data-canvas-element-id]')
+      : null;
+    const elementId = target?.dataset.canvasElementId;
+    if (!elementId || !otherElements.some((element) => element.id === elementId)) {
+      event.preventDefault();
+      setContextElementId(null);
+      return;
+    }
+    setContextElementId(elementId);
+    onSelectElement(elementId);
+  };
+
+  const copyContextElement = () => {
+    if (!contextElementId) return;
+    const store = useEditorStore.getState();
+    store.selectElement(contextElementId);
+    store.copySelected();
+  };
 
   // ----- Rubber-band drag on canvas background --------------------------------
   const handleBoardPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!selectionEnabled) return;
       // Only react to direct clicks on the board (not on child elements)
       if (e.target !== boardRef.current) return;
       if (e.button !== 0) return;
@@ -80,6 +170,7 @@ export function CanvasBoard({
       setSelectionBox({ startX, startY, currentX: startX, currentY: startY });
 
       const onPointerMove = (moveEvt: PointerEvent) => {
+        if (!selectionEnabledRef.current) return;
         const currentX = (moveEvt.clientX - rect.left) / zoom;
         const currentY = (moveEvt.clientY - rect.top) / zoom;
         setSelectionBox((prev) => prev ? { ...prev, currentX, currentY } : null);
@@ -88,6 +179,10 @@ export function CanvasBoard({
       const onPointerUp = (upEvt: PointerEvent) => {
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
+        if (!selectionEnabledRef.current) {
+          setSelectionBox(null);
+          return;
+        }
 
         setSelectionBox((prev) => {
           if (!prev) return null;
@@ -113,13 +208,13 @@ export function CanvasBoard({
 
             if (hit.length > 0) {
               // Use selectMultiple via the editor store directly
-              import('@/stores/editor-store').then(({ useEditorStore }) => {
+              if (selectionEnabledRef.current) {
                 useEditorStore.getState().selectMultiple(
                   upEvt.shiftKey || upEvt.metaKey
                     ? Array.from(new Set([...useEditorStore.getState().selectedElementIds, ...hit]))
                     : hit
                 );
-              });
+              }
             }
           }
 
@@ -130,7 +225,7 @@ export function CanvasBoard({
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerUp);
     },
-    [zoom, otherElements, onSelectElement]
+    [selectionEnabled, zoom, otherElements, onSelectElement]
   );
 
   // ----- Multi-element drag (shared bounding box transformer) ----------------
@@ -153,6 +248,7 @@ export function CanvasBoard({
 
   // Drag handler for the multi-select bounding box
   const handleMultiDragPointerDown = (e: React.PointerEvent) => {
+    if (!selectionEnabled) return;
     if (e.button !== 0) return;
     e.stopPropagation();
 
@@ -214,10 +310,14 @@ export function CanvasBoard({
       : null;
 
   return (
+    <>
+    <ContextMenu onOpenChange={(open) => { if (!open) setContextElementId(null); }}>
+      <ContextMenuTrigger asChild>
     <div
       ref={boardRef}
       id="slide-canvas-board"
       onPointerDown={handleBoardPointerDown}
+      onContextMenuCapture={handleObjectContextMenu}
       className="relative select-none rounded-sm shadow-2xl transition-shadow ring-1 ring-border/50"
       style={{
         width: `${width}px`,
@@ -247,9 +347,19 @@ export function CanvasBoard({
         <ElementWrapper
           key={el.id}
           element={el}
+          isRemixing={remixingImageId === el.id}
           isSelected={selectedElementIds.includes(el.id)}
+          selectionEnabled={selectionEnabled}
+          isEditing={editingElementId === el.id}
           onSelect={(id, addToSelection) => onSelectElement(id, addToSelection)}
           onUpdate={onUpdateElement}
+          onTextPointerDown={handleTextPointerDown}
+          onEditStart={() => {
+            if (selectionEnabled && el.type === 'text' && !el.locked) setEditingElementId(el.id);
+          }}
+          onEditEnd={() => {
+            setEditingElementId((current) => (current === el.id ? null : current));
+          }}
         />
       ))}
 
@@ -262,7 +372,7 @@ export function CanvasBoard({
       />
 
       {/* Single element transformer */}
-      {singleSelected && (
+      {selectionEnabled && singleSelected && (
         <ElementTransformer
           element={singleSelected}
           canvasWidth={width}
@@ -271,12 +381,15 @@ export function CanvasBoard({
           zoom={zoom}
           onUpdate={(updates) => onUpdateElement(singleSelected.id, updates)}
           setGuides={setGuides}
+          isEditing={editingElementId === singleSelected.id}
+          onTextPointerDown={handleTextPointerDown}
         />
       )}
 
       {/* Multi-select bounding box + move handle */}
-      {multiBBox && (
+      {selectionEnabled && multiBBox && (
         <div
+          data-canvas-element-id={selectedElements[0].id}
           onPointerDown={handleMultiDragPointerDown}
           className="absolute z-30 cursor-move border-2 border-primary pointer-events-auto"
           style={{
@@ -308,7 +421,7 @@ export function CanvasBoard({
         </div>
       )}
 
-      {multiBBox && multiDragIndicator && (
+      {selectionEnabled && multiBBox && multiDragIndicator && (
         <DragIndicatorHUD
           x={multiDragIndicator.x}
           y={multiDragIndicator.y}
@@ -320,7 +433,7 @@ export function CanvasBoard({
       )}
 
       {/* Rubber-band selection marquee */}
-      {selBoxStyle && selBoxStyle.width > 2 && selBoxStyle.height > 2 && (
+      {selectionEnabled && selBoxStyle && selBoxStyle.width > 2 && selBoxStyle.height > 2 && (
         <div
           className="pointer-events-none absolute z-40 border border-primary bg-primary/10"
           style={selBoxStyle}
@@ -328,11 +441,41 @@ export function CanvasBoard({
       )}
 
       {/* Canvas Edge Resize Handles */}
-      <CanvasResizeHandles
+      {selectionEnabled && <CanvasResizeHandles
         canvasWidth={width}
         canvasHeight={height}
         zoom={zoom}
-      />
+      />}
     </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="min-w-44">
+        {contextElement?.type === 'image' && (
+          <>
+            <ContextMenuItem onSelect={() => setReplacementImageId(contextElement.id)}>Remix image...</ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        )}
+        <ContextMenuItem disabled={!contextElement} onSelect={copyContextElement}>Copy</ContextMenuItem>
+        <ContextMenuItem disabled={!contextElement} onSelect={() => contextElementId && useEditorStore.getState().duplicateElement(contextElementId)}>Duplicate</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem disabled={contextLayerIndex < 0 || contextLayerIndex === otherElements.length - 1} onSelect={() => contextElementId && useEditorStore.getState().bringForward(contextElementId)}>Bring forward</ContextMenuItem>
+        <ContextMenuItem disabled={contextLayerIndex < 0 || contextLayerIndex === otherElements.length - 1} onSelect={() => contextElementId && useEditorStore.getState().bringToFront(contextElementId)}>Bring to front</ContextMenuItem>
+        <ContextMenuItem disabled={contextLayerIndex <= 0} onSelect={() => contextElementId && useEditorStore.getState().sendBackward(contextElementId)}>Send backward</ContextMenuItem>
+        <ContextMenuItem disabled={contextLayerIndex <= 0} onSelect={() => contextElementId && useEditorStore.getState().sendToBack(contextElementId)}>Send to back</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem disabled={!contextElement} onSelect={() => contextElementId && useEditorStore.getState().toggleElementLock(contextElementId)}>{contextElement?.locked ? 'Unlock' : 'Lock'}</ContextMenuItem>
+        <ContextMenuItem disabled={!contextElement} className="text-destructive focus:text-destructive" onSelect={() => contextElementId && useEditorStore.getState().deleteElement(contextElementId)}>Delete</ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+    {replacementImage?.type === 'image' && (
+      <ReplaceImageDialog
+        key={replacementImage.id}
+        element={replacementImage}
+        slideId={slide.id}
+        onClose={() => setReplacementImageId(null)}
+        onRemixPendingChange={(pending) => setRemixingImageId(pending ? replacementImage.id : null)}
+      />
+    )}
+    </>
   );
 }

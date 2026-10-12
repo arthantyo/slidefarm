@@ -90,12 +90,14 @@ export function CanvasViewport({
     };
   }, [isSpacePressed, setActiveTool]);
 
-  // Wheel interactions: pinch/ctrl zoom, trackpad/wheel pan
+  // Wheel interactions: alt (or trackpad pinch) zoom, otherwise pan
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     if (!containerRef.current) return;
 
-    if (e.ctrlKey || e.metaKey) {
+    // altKey is the mouse zoom modifier. ctrlKey stays so trackpad pinch,
+    // which browsers report as a ctrl+wheel event, still zooms.
+    if (e.altKey || e.ctrlKey) {
       // Zoom towards cursor
       const rect = containerRef.current.getBoundingClientRect();
       const cursorX = e.clientX - rect.left;
@@ -211,6 +213,7 @@ export function CanvasViewport({
     : isSpacePressed || activeTool === 'hand'
     ? 'cursor-grab'
     : 'cursor-default';
+  const selectionEnabled = activeTool === 'select' && !isSpacePressed;
 
   return (
     <div
@@ -257,6 +260,7 @@ export function CanvasViewport({
           selectedElementIds={selectedElementIds}
           guides={guides}
           showGrid={showGrid}
+          selectionEnabled={selectionEnabled}
           onSelectElement={onSelectElement}
           onUpdateElement={onUpdateElement}
           setGuides={setGuides}

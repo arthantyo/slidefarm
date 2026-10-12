@@ -6,6 +6,7 @@ import { useEditorStore } from "@/stores/editor-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useCustomTemplateStore } from "@/stores/custom-template-store";
 import { projectToCustomTemplate } from "@/lib/canvas/template-filler";
+import { saveEditorProject } from "@/lib/canvas/save-editor-project";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -67,6 +68,7 @@ export function EditorTopBar({ onOpenGenerator }: EditorTopBarProps) {
   } = useEditorStore();
   const saveProject = useProjectStore((s) => s.save);
   const storageError = useProjectStore((s) => s.storageError);
+  const templateStorageError = useCustomTemplateStore((s) => s.storageError);
   const { theme, setTheme } = useTheme();
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState("");
@@ -78,12 +80,13 @@ export function EditorTopBar({ onOpenGenerator }: EditorTopBarProps) {
   const [templateName, setTemplateName] = useState("");
   const [templateDescription, setTemplateDescription] = useState("");
   const [templateCategory, setTemplateCategory] = useState("Custom");
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
 
   if (!project) return null;
 
   const handleSave = async () => {
     setIsSaving(true);
-    const saved = await saveProject(project);
+    const saved = await saveEditorProject(project);
     if (saved && useEditorStore.getState().project === project) markClean();
     setIsSaving(false);
   };
@@ -91,26 +94,18 @@ export function EditorTopBar({ onOpenGenerator }: EditorTopBarProps) {
   const handleSaveTemplate = async () => {
     const name = templateName.trim();
     if (!name) return;
+    setIsSavingTemplate(true);
     const templateStore = useCustomTemplateStore.getState();
-    templateStore.load();
+    await templateStore.load();
     const existingTemplate = templateIdToUpdate
       ? templateStore.get(templateIdToUpdate)
       : undefined;
-    const updatedTemplate = projectToCustomTemplate(
-      project,
-      name,
-      templateDescription.trim(),
-      templateCategory.trim() || "Custom",
-    );
-    templateStore.save(
-      existingTemplate
-        ? {
-            ...updatedTemplate,
-            id: existingTemplate.id,
-            createdAt: existingTemplate.createdAt,
-          }
-        : updatedTemplate,
-    );
+    const updatedTemplate = projectToCustomTemplate(project, name, templateDescription.trim(), templateCategory.trim() || "Custom");
+    const saved = await templateStore.save(existingTemplate
+      ? { ...updatedTemplate, id: existingTemplate.id, createdAt: existingTemplate.createdAt }
+      : updatedTemplate);
+    setIsSavingTemplate(false);
+    if (!saved) return;
     if (
       (await saveProject(project)) &&
       useEditorStore.getState().project === project
@@ -119,9 +114,9 @@ export function EditorTopBar({ onOpenGenerator }: EditorTopBarProps) {
     setTemplateDialogOpen(false);
   };
 
-  const openTemplateDialog = () => {
+  const openTemplateDialog = async () => {
     const templateStore = useCustomTemplateStore.getState();
-    templateStore.load();
+    await templateStore.load();
     const templateId =
       typeof window === "undefined"
         ? null
@@ -193,6 +188,11 @@ export function EditorTopBar({ onOpenGenerator }: EditorTopBarProps) {
         {storageError && (
           <span className="text-xs text-destructive" role="alert">
             Save failed: local file unavailable
+          </span>
+        )}
+        {templateStorageError && (
+          <span className="text-xs text-destructive" role="alert">
+            {templateStorageError}
           </span>
         )}
       </div>
@@ -364,11 +364,14 @@ export function EditorTopBar({ onOpenGenerator }: EditorTopBarProps) {
             </div>
           </div>
           <DialogFooter>
+            {templateStorageError && (
+              <p className="text-sm text-destructive" role="alert">{templateStorageError}</p>
+            )}
             <Button
               onClick={handleSaveTemplate}
-              disabled={!templateName.trim()}
+              disabled={!templateName.trim() || isSavingTemplate}
             >
-              {templateIdToUpdate ? "Update template" : "Save template"}
+              {isSavingTemplate ? "Saving..." : templateIdToUpdate ? "Update template" : "Save template"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -8,13 +8,17 @@ export interface ProjectFileData {
   folders: ProjectFolder[];
 }
 
-function dataPath() {
+export function dataDirectory() {
   const base = process.platform === 'win32'
     ? process.env.APPDATA || join(homedir(), 'AppData', 'Roaming')
     : process.platform === 'darwin'
       ? join(homedir(), 'Library', 'Application Support')
       : process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share');
-  const directory = process.env.SLIDEFARM_DATA_DIR || join(base, 'SlideFarm');
+  return process.env.SLIDEFARM_DATA_DIR || join(base, 'SlideFarm');
+}
+
+function dataPath() {
+  const directory = dataDirectory();
   return { directory, file: join(directory, 'projects.json') };
 }
 

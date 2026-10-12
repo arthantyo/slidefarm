@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import type { Project, Slide, CanvasElement, CustomTemplate } from '@/types';
+import type { Project, Slide, CanvasElement, CustomTemplate, Template } from '@/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,13 +43,14 @@ function fillSlides(slides: Slide[], data: TemplateData): Slide[] {
     ...slide,
     id: nanoid(10),
     elements: slide.elements.map((el) => {
+      const cloned = el.type === 'background' ? { ...el } : { ...el, id: nanoid(10) };
       if (el.type !== 'text' || !el.placeholder || !Array.isArray(data[el.placeholder])) {
-        return fillElement(el, data, 0);
+        return fillElement(cloned, data, 0);
       }
       const key = el.placeholder;
       const occurrenceIndex = occurrenceCounts.get(key) ?? 0;
       occurrenceCounts.set(key, occurrenceIndex + 1);
-      return fillElement(el, data, occurrenceIndex);
+      return fillElement(cloned, data, occurrenceIndex);
     }),
   }));
 }
@@ -64,14 +65,14 @@ function fillSlides(slides: Slide[], data: TemplateData): Slide[] {
  * replace them manually in the editor.
  */
 export function fillTemplateFromData(
-  template: CustomTemplate | Project,
+  template: Template | Project,
   data: TemplateData,
   projectName?: string,
 ): Project {
   const slides = fillSlides(template.slides, data);
   return {
     id: nanoid(10),
-    name: projectName ?? ('name' in template ? template.name : 'Untitled'),
+    name: projectName ?? template.name,
     dimensions: template.dimensions,
     slides,
     theme: template.theme,
@@ -104,5 +105,16 @@ export function projectToCustomTemplate(
     slides: JSON.parse(JSON.stringify(project.slides)) as Slide[],
     thumbnail: project.thumbnail ?? null,
     createdAt: Date.now(),
+  };
+}
+
+export function updateCustomTemplateFromProject(
+  project: Project,
+  existing: CustomTemplate,
+): CustomTemplate {
+  return {
+    ...projectToCustomTemplate(project, existing.name, existing.description, existing.category),
+    id: existing.id,
+    createdAt: existing.createdAt,
   };
 }

@@ -394,9 +394,9 @@ export function createBlankProject(
   name: string,
   width: number = 1080,
   height: number = 1920,
-  themeKey: string = "modern-editorial",
+  themeKey: string = "minimal-bw",
 ): Project {
-  const theme = DEFAULT_THEMES[themeKey] ?? DEFAULT_THEMES["modern-editorial"];
+  const theme = DEFAULT_THEMES[themeKey] ?? DEFAULT_THEMES["minimal-bw"];
   const cover = buildCoverSlide(
     width,
     height,

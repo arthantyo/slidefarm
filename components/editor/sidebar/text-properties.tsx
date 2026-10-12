@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TextElement, TextAlign, FontStyle } from "@/types";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,8 +33,69 @@ interface TextPropertiesProps {
   onUpdate: (updates: Partial<TextElement>) => void;
 }
 
+const MIN_FONT_SIZE = 1;
+const MAX_FONT_SIZE = 9999;
+
+function clampFontSize(value: number) {
+  return Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, Math.round(value)));
+}
+
+function ExpandableTextarea({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const floorRef = useRef(72);
+  const resizeOrigin = useRef<number | null>(null);
+
+  const fit = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const needed = Math.max(el.scrollHeight, 72);
+    el.style.height = `${Math.max(needed, floorRef.current)}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    fit();
+  }, [fit, value]);
+
+  return (
+    <Textarea
+      ref={ref}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onPointerDown={(e) => {
+        const el = ref.current;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        if (e.clientY >= rect.bottom - 14) resizeOrigin.current = el.offsetHeight;
+      }}
+      onPointerUp={() => {
+        const el = ref.current;
+        if (!el || resizeOrigin.current === null) return;
+        if (el.offsetHeight !== resizeOrigin.current) {
+          floorRef.current = Math.max(72, el.offsetHeight);
+          fit();
+        }
+        resizeOrigin.current = null;
+      }}
+      className="min-h-[72px] resize-y overflow-hidden text-sm"
+    />
+  );
+}
+
 export function TextProperties({ element, onUpdate }: TextPropertiesProps) {
   const [isRewriting, setIsRewriting] = useState(false);
+  const [fontSizeInput, setFontSizeInput] = useState(String(element.fontSize));
+  const fontSizeFocused = useRef(false);
+
+  useEffect(() => {
+    if (!fontSizeFocused.current) setFontSizeInput(String(element.fontSize));
+  }, [element.fontSize]);
 
   const toggleBold = () => {
     onUpdate({ fontWeight: getTextFontWeight(element) >= 700 ? 400 : 700 });
@@ -75,10 +136,9 @@ export function TextProperties({ element, onUpdate }: TextPropertiesProps) {
       {/* Text content */}
       <div className="space-y-1.5">
         <Label className="text-xs">Text</Label>
-        <Textarea
+        <ExpandableTextarea
           value={element.text}
-          onChange={(e) => onUpdate({ text: e.target.value })}
-          className="min-h-[60px] resize-none text-sm"
+          onChange={(text) => onUpdate({ text })}
         />
       </div>
 
@@ -146,14 +206,45 @@ export function TextProperties({ element, onUpdate }: TextPropertiesProps) {
           <Slider
             value={[element.fontSize]}
             onValueChange={(v) => onUpdate({ fontSize: v[0] })}
-            min={8}
-            max={200}
+            min={Math.min(8, element.fontSize)}
+            max={Math.max(200, element.fontSize)}
             step={1}
             className="flex-1"
           />
-          <span className="w-10 text-right text-xs text-muted-foreground">
-            {element.fontSize}px
-          </span>
+          <div className="flex items-center gap-1">
+            <Input
+              type="number"
+              min={MIN_FONT_SIZE}
+              max={MAX_FONT_SIZE}
+              value={fontSizeInput}
+              onFocus={() => {
+                fontSizeFocused.current = true;
+              }}
+              onChange={(e) => {
+                const raw = e.target.value;
+                setFontSizeInput(raw);
+                if (raw.trim() === "") return;
+                const next = Number(raw);
+                if (!Number.isFinite(next)) return;
+                if (next < MIN_FONT_SIZE || next > MAX_FONT_SIZE) return;
+                onUpdate({ fontSize: clampFontSize(next) });
+              }}
+              onBlur={() => {
+                fontSizeFocused.current = false;
+                const next = Number(fontSizeInput);
+                if (fontSizeInput.trim() === "" || !Number.isFinite(next)) {
+                  setFontSizeInput(String(element.fontSize));
+                  return;
+                }
+                const size = clampFontSize(next);
+                onUpdate({ fontSize: size });
+                setFontSizeInput(String(size));
+              }}
+              aria-label="Font size"
+              className="h-7 w-16 px-2 text-xs font-mono"
+            />
+            <span className="text-[10px] text-muted-foreground">px</span>
+          </div>
         </div>
       </div>
 

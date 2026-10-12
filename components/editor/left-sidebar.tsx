@@ -14,6 +14,7 @@ import {
 import type { ShapeKind } from '@/types';
 import { FONT_OPTIONS, COLOR_PALETTE } from '@/lib/canvas/themes';
 import { ImageUrlInput, FileUpload } from './sidebar/image-upload-tab';
+import { ImageGenerator } from './sidebar/image-generator';
 
 type Tab = 'text' | 'shapes' | 'images' | 'uploads' | 'ai' | 'templates';
 
@@ -76,6 +77,20 @@ export function LeftSidebar({ onOpenGenerator }: LeftSidebarProps) {
       name: 'Image',
     });
     addElement(el);
+  };
+
+  const addGeneratedImage = (src: string, imagePrompt: string) => {
+    const w = project.dimensions.width * 0.5;
+    const h = project.dimensions.height * 0.3;
+    addElement(createImageElement({
+      x: (project.dimensions.width - w) / 2,
+      y: (project.dimensions.height - h) / 2,
+      width: w,
+      height: h,
+      src,
+      imagePrompt,
+      name: 'Generated Image',
+    }));
   };
 
   const tabs: { key: Tab; icon: typeof Type; label: string }[] = [
@@ -196,6 +211,12 @@ export function LeftSidebar({ onOpenGenerator }: LeftSidebarProps) {
               {tab === 'images' && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold">Images</h3>
+                  <ImageGenerator
+                    width={project.dimensions.width * 0.5}
+                    height={project.dimensions.height * 0.3}
+                    onAdd={addGeneratedImage}
+                  />
+                  <Separator />
                   <p className="text-xs text-muted-foreground">Paste an image URL to add it to the canvas.</p>
                   <ImageUrlInput onAdd={addImageByUrl} />
                 </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -27,12 +27,15 @@ import { PLATFORM_PRESETS } from '@/types';
 import type { GenerationOptions, AspectRatioKey, Tone, ContentDensity, VisualStyle, Project, TextElement } from '@/types';
 import { useEditorStore } from '@/stores/editor-store';
 import { useProjectStore } from '@/stores/project-store';
-import { assembleProject, assembleRemixedProject } from '@/lib/ai/assembly';
+import { assembleProject, assembleRemixedProject, isRemixableTextElement } from '@/lib/ai/assembly';
+import type { RemixResult } from '@/lib/ai/remix-types';
 
 interface GeneratorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   remixProject?: Project | null;
+  /** True while a remix is in flight so the dashboard can show the new card. */
+  onRemixPendingChange?: (pending: boolean) => void;
 }
 
 const TONE_OPTIONS: { value: Tone; label: string }[] = [
@@ -61,7 +64,7 @@ const STYLE_OPTIONS: { value: VisualStyle; label: string }[] = [
   { value: 'abstract', label: 'Abstract' },
 ];
 
-export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorDialogProps) {
+export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendingChange }: GeneratorDialogProps) {
   const router = useRouter();
   const loadProject = useEditorStore((s) => s.loadProject);
   const setGenerating = useEditorStore((s) => s.setGenerating);
@@ -79,10 +82,15 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
   const [customInstructions, setCustomInstructions] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const preserveFormOnOpen = useRef(false);
 
   useEffect(() => {
     if (!open) return;
-    setPrompt(remixProject ? `Remix ${remixProject.name}` : '');
+    if (preserveFormOnOpen.current) {
+      preserveFormOnOpen.current = false;
+      return;
+    }
+    setPrompt('');
     setAutoSlideCount(!remixProject);
     setSlideCount(remixProject?.slides.length ?? 6);
     setError(null);
@@ -99,15 +107,16 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
     setGenerating(true);
     setGenerationProgress({ stage: 'Planning content structure', current: 1, total: 6 });
 
+    const remixing = Boolean(remixProject);
+    if (remixing) {
+      onRemixPendingChange?.(true);
+      onOpenChange(false);
+    }
+
     try {
       const preset = PLATFORM_PRESETS.find((p) => p.key === platform) ?? PLATFORM_PRESETS[3];
-      const sourceText = remixProject?.slides.flatMap((slide, index) => [
-        `Slide ${index + 1} (${slide.type}): ${slide.elements
-          .filter((element): element is TextElement => element.type === 'text')
-          .map((element) => `${element.name}: ${element.text}`)
-          .filter(Boolean)
-          .join(' | ')}`,
-      ]).join('\n').slice(0, 8000);
+      setGenerationProgress({ stage: 'Generating slide content', current: 2, total: 6 });
+      const endpoint = remixProject ? '/api/ai/remix' : '/api/ai/generate';
       const options: GenerationOptions = {
         prompt: prompt.trim(),
         slideCount: autoSlideCount ? 'auto' : slideCount,
@@ -117,18 +126,47 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
         contentDensity: density,
         language,
         visualStyle,
-        customInstructions: [
-          remixProject && `Use this existing slideshow as the source material. Keep exactly ${remixProject.slides.length} slides in the same order and rewrite their copy to fit the user's remix request. The original layout, images, colors, and typography will be preserved. Keep each headline and body similar in length to the source so it fits its existing text box. For slides with Item 1, Item 2, etc., provide a matching listItems array with the same number of items:\n${sourceText}`,
-          customInstructions.trim(),
-        ].filter(Boolean).join('\n\n') || undefined,
+        customInstructions: customInstructions.trim() || undefined,
       };
-
-      setGenerationProgress({ stage: 'Generating slide content', current: 2, total: 6 });
-
-      const res = await fetch('/api/ai/generate', {
+      const body = remixProject ? {
+        source: {
+          name: remixProject.name,
+          slides: remixProject.slides.map((slide) => ({
+            type: slide.type,
+            notes: slide.notes,
+            texts: slide.elements
+              .filter((element): element is TextElement => element.type === 'text' && isRemixableTextElement(element))
+              .map((element) => ({
+                name: element.name,
+                text: element.text,
+                x: element.x,
+                y: element.y,
+                width: element.width,
+                height: element.height,
+                fontSize: element.fontSize,
+                placeholder: element.placeholder,
+              })),
+            visuals: slide.elements.flatMap<{ name: string; kind: string; description?: string }>((element) => {
+              if (element.type === 'image') {
+                return [{ name: element.name, kind: 'image', description: element.imagePrompt }];
+              }
+              if (element.type === 'shape' && element.name && element.name !== 'Shape') {
+                return [{ name: element.name, kind: element.shape }];
+              }
+              return [];
+            }),
+          })),
+        },
+        instruction: prompt.trim(),
+        tone,
+        density,
+        language,
+        customInstructions: customInstructions.trim() || undefined,
+      } : options;
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(options),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -136,7 +174,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
         throw new Error(err.error || 'Generation failed');
       }
 
-      const { plan } = await res.json();
+      const result = await res.json();
 
       setGenerationProgress({ stage: 'Designing layouts', current: 3, total: 6 });
 
@@ -145,8 +183,8 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
       setGenerationProgress({ stage: 'Assembling slides', current: 4, total: 6 });
 
       const project = remixProject
-        ? assembleRemixedProject(plan, remixProject)
-        : assembleProject(plan, preset.width, preset.height);
+        ? assembleRemixedProject(result.remix as RemixResult, remixProject)
+        : assembleProject(result.plan, preset.width, preset.height);
 
       setGenerationProgress({ stage: 'Preparing editor', current: 5, total: 6 });
 
@@ -157,11 +195,17 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
 
       setGenerationProgress({ stage: 'Done', current: 6, total: 6 });
 
+      if (remixing) onRemixPendingChange?.(false);
       onOpenChange(false);
       router.push(`/editor/${project.id}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Generation failed';
       setError(message);
+      if (remixing) {
+        preserveFormOnOpen.current = true;
+        onRemixPendingChange?.(false);
+        onOpenChange(true);
+      }
     } finally {
       setIsGenerating(false);
       setGenerating(false);
@@ -190,7 +234,9 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
             <Label htmlFor="prompt">{remixProject ? 'How should this slideshow change?' : 'What is your slideshow about?'}</Label>
             <Textarea
               id="prompt"
-              placeholder="e.g. 7 benefits of learning Python, 5 tips for saving money, how to start a morning routine..."
+              placeholder={remixProject
+                ? 'e.g. Make the advice specific to first-time founders, with a more direct tone'
+                : 'e.g. 7 benefits of learning Python, 5 tips for saving money, how to start a morning routine...'}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               className="min-h-[80px] resize-none"
@@ -201,9 +247,24 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
               }}
             />
             <p className="text-xs text-muted-foreground">
-              Tip: Include the number of slides, topic, and style for best results.
+              {remixProject
+                ? 'Say what audience, angle, or message you want to change. The existing slide design stays in place.'
+                : 'Tip: Include the number of slides, topic, and style for best results.'}
             </p>
           </div>
+
+          {remixProject && (
+            <div className="space-y-2">
+              <Label htmlFor="remix-context">Important context to preserve (optional)</Label>
+              <Textarea
+                id="remix-context"
+                value={customInstructions}
+                onChange={(e) => setCustomInstructions(e.target.value)}
+                placeholder="e.g. Slide 3 quotes a customer; it is not my own claim. Keep the contrast between slides 4 and 5."
+                className="min-h-[70px] resize-none"
+              />
+            </div>
+          )}
 
           {/* Advanced toggle */}
           <button
@@ -218,8 +279,8 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
 
           {showAdvanced && (
             <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
-              {/* Platform */}
-              <div className="space-y-2">
+              {/* Platform and slide count apply only to new decks. */}
+              {!remixProject && <div className="space-y-2">
                 <Label>Platform</Label>
                 <Select value={platform} onValueChange={setPlatform}>
                   <SelectTrigger>
@@ -233,10 +294,10 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </div>}
 
               {/* Slide count */}
-              <div className="space-y-2">
+              {!remixProject && <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label>Slide Count</Label>
                   <div className="flex items-center gap-2">
@@ -257,7 +318,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
                     <span className="w-8 text-center text-sm font-medium">{slideCount}</span>
                   </div>
                 )}
-              </div>
+              </div>}
 
               {/* Tone + Density */}
               <div className="grid grid-cols-2 gap-3">
@@ -293,9 +354,9 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
                 </div>
               </div>
 
-              {/* Visual style + Language */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
+              {/* Visual style changes only new decks; remix keeps the existing design. */}
+              <div className={remixProject ? 'space-y-2' : 'grid grid-cols-2 gap-3'}>
+                {!remixProject && <div className="space-y-2">
                   <Label>Visual Style</Label>
                   <Select value={visualStyle} onValueChange={(v) => setVisualStyle(v as VisualStyle)}>
                     <SelectTrigger>
@@ -309,7 +370,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </div>}
                 <div className="space-y-2">
                   <Label>Language</Label>
                   <Input
@@ -321,7 +382,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
               </div>
 
               {/* Custom instructions */}
-              <div className="space-y-2">
+              {!remixProject && <div className="space-y-2">
                 <Label>Custom Instructions</Label>
                 <Textarea
                   value={customInstructions}
@@ -329,7 +390,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
                   placeholder="Any additional guidance for the AI..."
                   className="min-h-[60px] resize-none"
                 />
-              </div>
+              </div>}
             </div>
           )}
 
@@ -354,7 +415,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorD
               ) : (
                 <>
                   <Wand2 className="h-4 w-4" />
-                  Generate
+                  {remixProject ? 'Remix' : 'Generate'}
                 </>
               )}
             </Button>

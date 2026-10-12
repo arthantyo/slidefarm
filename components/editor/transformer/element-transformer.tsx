@@ -16,6 +16,8 @@ interface ElementTransformerProps {
   zoom: number;
   onUpdate: (updates: Partial<CanvasElement>) => void;
   setGuides: (guides: GuideLine[]) => void;
+  isEditing: boolean;
+  onTextPointerDown: (element: CanvasElement, event: React.PointerEvent) => boolean;
 }
 
 export function ElementTransformer({
@@ -26,6 +28,8 @@ export function ElementTransformer({
   zoom,
   onUpdate,
   setGuides,
+  isEditing,
+  onTextPointerDown,
 }: ElementTransformerProps) {
   const [hudState, setHudState] = useState<{
     visible: boolean;
@@ -43,6 +47,7 @@ export function ElementTransformer({
   const handleDragPointerDown = (e: React.PointerEvent) => {
     if (element.locked || e.button !== 0) return;
     e.stopPropagation();
+    if (onTextPointerDown(element, e)) return;
 
     const startPointerX = e.clientX;
     const startPointerY = e.clientY;
@@ -210,9 +215,12 @@ export function ElementTransformer({
     <>
       {/* Selection outline & drag target */}
       <div
+        data-canvas-element-id={element.id}
         onPointerDown={handleDragPointerDown}
-        className={`absolute z-30 pointer-events-auto border-2 border-primary ${
-          element.locked ? 'border-dashed border-muted-foreground/60' : 'cursor-move'
+        className={`absolute z-30 border-2 border-primary ${
+          isEditing ? 'pointer-events-none' : 'pointer-events-auto'
+        } ${
+          element.locked ? 'border-dashed border-muted-foreground/60' : isEditing ? '' : 'cursor-move'
         }`}
         style={{
           left: `${element.x}px`,

@@ -91,6 +91,50 @@
   transition-duration: 150ms;
 }
 
+/* Soft highlight that sweeps skeleton bones on the pending remix card. */
+.remix-shimmer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.remix-shimmer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 55%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    hsl(0 0% 100% / 0.02) 28%,
+    hsl(0 0% 100% / 0.42) 50%,
+    hsl(0 0% 100% / 0.02) 72%,
+    transparent 100%
+  );
+  transform: translateX(-130%);
+  animation: remix-shimmer 1.45s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.dark .remix-shimmer::after {
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    hsl(0 0% 100% / 0.02) 32%,
+    hsl(0 0% 100% / 0.22) 50%,
+    hsl(0 0% 100% / 0.02) 68%,
+    transparent 100%
+  );
+}
+
+@keyframes remix-shimmer {
+  to {
+    transform: translateX(280%);
+  }
+}
+
 /* Range slider styling */
 input[type="range"] {
   -webkit-appearance: none;

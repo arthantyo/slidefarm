@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Project, ProjectFolder } from "@/types";
 import { useProjectStore } from "@/stores/project-store";
@@ -20,11 +20,13 @@ import {
   Sparkles,
   Plus,
   LayoutGrid,
+  List,
   Clock,
   FolderPlus,
   Pencil,
   Trash2,
 } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -53,6 +55,8 @@ import {
 import { useTheme } from "@/components/theme-provider";
 import { Moon, Sun } from "lucide-react";
 
+const PROJECT_VIEW_KEY = "slidefarm-project-view";
+
 export default function DashboardPage() {
   const router = useRouter();
   const {
@@ -72,10 +76,14 @@ export default function DashboardPage() {
   const loadProject = useEditorStore((s) => s.loadProject);
   const customTemplates = useCustomTemplateStore((s) => s.templates);
   const loadCustomTemplates = useCustomTemplateStore((s) => s.load);
+  const templateStorageError = useCustomTemplateStore((s) => s.storageError);
   const [generatorOpen, setGeneratorOpen] = useState(false);
   const [remixProject, setRemixProject] = useState<Project | null>(null);
+  const [remixingSource, setRemixingSource] = useState<Project | null>(null);
+  const remixingRef = useRef(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState("all");
+  const [projectView, setProjectView] = useState<"card" | "list">("card");
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
   const [folderName, setFolderName] = useState("");
   const [folderIdToEdit, setFolderIdToEdit] = useState<string | null>(null);
@@ -93,6 +101,16 @@ export default function DashboardPage() {
     loadCustomTemplates();
   }, [loadCustomTemplates]);
 
+  useEffect(() => {
+    const stored = localStorage.getItem(PROJECT_VIEW_KEY);
+    if (stored === "list" || stored === "card") setProjectView(stored);
+  }, []);
+
+  const changeProjectView = (view: "card" | "list") => {
+    setProjectView(view);
+    localStorage.setItem(PROJECT_VIEW_KEY, view);
+  };
+
   const sortedProjects = [...projects].sort(
     (a, b) => b.updatedAt - a.updatedAt,
   );
@@ -103,6 +121,13 @@ export default function DashboardPage() {
   });
   const selectedFolder = folders.find(
     (folder) => folder.id === selectedFolderId,
+  );
+  const remixingVisible = Boolean(
+    remixingSource &&
+    (selectedFolderId === "all" ||
+      (selectedFolderId === "unfiled"
+        ? !remixingSource.folderId
+        : remixingSource.folderId === selectedFolderId)),
   );
 
   const openFolderDialog = (folder?: ProjectFolder) => {
@@ -170,6 +195,11 @@ export default function DashboardPage() {
             role="alert"
           >
             {storageError}
+          </div>
+        )}
+        {templateStorageError && (
+          <div className="mb-6 rounded-md border border-destructive p-3 text-sm text-destructive" role="alert">
+            {templateStorageError}
           </div>
         )}
         {/* Hero section */}
@@ -302,6 +332,24 @@ export default function DashboardPage() {
                   </Button>
                 </>
               )}
+              <ToggleGroup
+                type="single"
+                value={projectView}
+                onValueChange={(value) => {
+                  if (value === "card" || value === "list") changeProjectView(value);
+                }}
+                variant="outline"
+                size="sm"
+                className="ml-auto"
+                aria-label="Project view"
+              >
+                <ToggleGroupItem value="card" aria-label="Card view" title="Cards">
+                  <LayoutGrid className="h-4 w-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="list" aria-label="List view" title="List">
+                  <List className="h-4 w-4" />
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
             {!loaded ? (
               <div className="py-12 text-center text-sm text-muted-foreground">
@@ -327,20 +375,45 @@ export default function DashboardPage() {
                   Generate with AI
                 </Button>
               </div>
-            ) : visibleProjects.length === 0 ? (
+            ) : visibleProjects.length === 0 && !remixingVisible ? (
               <div className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">
                 No projects in this folder yet.
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div
+                className={
+                  projectView === "list"
+                    ? "flex flex-col gap-2"
+                    : "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                }
+              >
+                {remixingVisible && remixingSource && (
+                  <ProjectCard
+                    project={{
+                      ...remixingSource,
+                      id: `remixing-${remixingSource.id}`,
+                    }}
+                    loading
+                    onOpen={() => {}}
+                    onDelete={() => {}}
+                    onDuplicate={() => {}}
+                    onRemix={() => {}}
+                    onRename={() => {}}
+                    folders={folders}
+                    onMoveToFolder={() => {}}
+                    layout={projectView}
+                  />
+                )}
                 {visibleProjects.map((project) => (
                   <ProjectCard
                     key={project.id}
                     project={project}
+                    layout={projectView}
                     onOpen={() => handleOpenProject(project.id)}
                     onDelete={() => handleDelete(project.id)}
                     onDuplicate={() => handleDuplicate(project.id)}
                     onRemix={() => {
+                      if (remixingRef.current) return;
                       setRemixProject(project);
                       setGeneratorOpen(true);
                     }}
@@ -359,13 +432,7 @@ export default function DashboardPage() {
             <TemplateGallery
               customTemplates={customTemplates}
               onUseTemplate={async (template) => {
-                const project = {
-                  ...JSON.parse(JSON.stringify(template)),
-                  id: createBlankProject(template.name).id,
-                  name: template.name,
-                  createdAt: Date.now(),
-                  updatedAt: Date.now(),
-                };
+                const project = fillTemplateFromData(template, {}, template.name);
                 if (!(await useProjectStore.getState().save(project))) return;
                 loadProject(project);
                 router.push(`/editor/${project.id}`);
@@ -381,22 +448,14 @@ export default function DashboardPage() {
                 router.push(`/editor/${project.id}`);
               }}
               onEditTemplate={async (template) => {
-                const project = {
-                  ...JSON.parse(JSON.stringify(template)),
-                  id: createBlankProject(template.name).id,
-                  name: template.name,
-                  createdAt: Date.now(),
-                  updatedAt: Date.now(),
-                };
+                const project = fillTemplateFromData(template, {}, template.name);
                 if (!(await useProjectStore.getState().save(project))) return;
                 loadProject(project);
                 router.push(
                   `/editor/${project.id}?editTemplate=${encodeURIComponent(template.id)}`,
                 );
               }}
-              onDeleteTemplate={(template) => {
-                useCustomTemplateStore.getState().delete(template.id);
-              }}
+              onDeleteTemplate={(template) => useCustomTemplateStore.getState().delete(template.id)}
             />
           </TabsContent>
         </Tabs>
@@ -405,9 +464,13 @@ export default function DashboardPage() {
       <GeneratorDialog
         open={generatorOpen}
         remixProject={remixProject}
+        onRemixPendingChange={(pending) => {
+          remixingRef.current = pending;
+          setRemixingSource(pending ? remixProject : null);
+        }}
         onOpenChange={(open) => {
           setGeneratorOpen(open);
-          if (!open) setRemixProject(null);
+          if (!open && !remixingRef.current) setRemixProject(null);
         }}
       />
       <Dialog open={folderDialogOpen} onOpenChange={setFolderDialogOpen}>

@@ -8,26 +8,40 @@ import { ShapeRenderer } from './shape-renderer';
 
 interface ElementWrapperProps {
   element: CanvasElement;
+  isRemixing?: boolean;
   isSelected: boolean;
+  selectionEnabled: boolean;
+  isEditing: boolean;
   onSelect: (id: string, addToSelection: boolean) => void;
   onUpdate: (id: string, updates: Partial<CanvasElement>) => void;
+  onTextPointerDown: (element: CanvasElement, event: React.PointerEvent) => boolean;
+  onEditStart: () => void;
+  onEditEnd: () => void;
 }
 
 export function ElementWrapper({
   element,
+  isRemixing = false,
   isSelected,
+  selectionEnabled,
+  isEditing,
   onSelect,
   onUpdate,
+  onTextPointerDown,
+  onEditStart,
+  onEditEnd,
 }: ElementWrapperProps) {
   if (!element.visible || element.type === 'background') {
     return null;
   }
 
   const handlePointerDown = (e: React.PointerEvent) => {
+    if (!selectionEnabled) return;
     // Left click only
     if (e.button !== 0) return;
     e.stopPropagation();
     onSelect(element.id, e.shiftKey || e.metaKey);
+    if (element.type === 'text') onTextPointerDown(element, e);
   };
 
   const transform = element.rotation ? `rotate(${element.rotation}deg)` : undefined;
@@ -35,9 +49,10 @@ export function ElementWrapper({
   return (
     <div
       id={`element-${element.id}`}
+      data-canvas-element-id={element.id}
       onPointerDown={handlePointerDown}
       className={`absolute select-none ${
-        element.locked ? 'cursor-not-allowed' : 'cursor-move'
+        !selectionEnabled ? 'cursor-grab' : element.locked ? 'cursor-not-allowed' : isEditing ? 'cursor-text' : 'cursor-move'
       }`}
       style={{
         left: `${element.x}px`,
@@ -54,11 +69,18 @@ export function ElementWrapper({
         <TextRenderer
           element={element as TextElement}
           isSelected={isSelected}
+          isEditing={isEditing}
+          onEditStart={onEditStart}
+          onEditEnd={onEditEnd}
           onUpdate={(updates) => onUpdate(element.id, updates)}
         />
       )}
       {element.type === 'image' && (
-        <ImageRenderer element={element as ImageElement} />
+        isRemixing ? (
+          <div className="relative h-full w-full overflow-hidden rounded bg-foreground/10" role="status" aria-label="Remixing image" aria-busy="true" style={{ borderRadius: `${element.cornerRadius}px` }}>
+            <div className="remix-shimmer" aria-hidden="true" />
+          </div>
+        ) : <ImageRenderer element={element as ImageElement} />
       )}
       {element.type === 'shape' && (
         <ShapeRenderer element={element as ShapeElement} />

@@ -1,41 +1,37 @@
 import { nanoid } from 'nanoid';
-import type { AIPlan, Project, Slide, Theme, CanvasElement, BackgroundElement } from '@/types';
+import type { AIPlan, Project, Slide, Theme, CanvasElement, BackgroundElement, TextElement } from '@/types';
 import { DEFAULT_THEMES } from '@/lib/canvas/themes';
 import { buildSlideFromPlan } from '@/lib/canvas/templates';
+import type { RemixResult } from './remix-types';
 
-/** Apply new copy to the existing slide elements so a remix keeps its design. */
-export function assembleRemixedProject(plan: AIPlan, source: Project): Project {
+export function isRemixableTextElement(element: TextElement): boolean {
+  const name = element.name.toLowerCase();
+  return !/^(num text|number|quote mark|page number|logo|brand)/.test(name) &&
+    !/^[\d\s\p{P}\p{S}]+$/u.test(element.text);
+}
+
+/** Apply copy by text box position while preserving every source slide element. */
+export function assembleRemixedProject(remix: RemixResult, source: Project): Project {
+  if (remix.slides.length !== source.slides.length) {
+    throw new Error('Remix slide count does not match the original project');
+  }
   const slides = source.slides.map((slide, index) => {
-    const planned = plan.slides[index];
-    const itemTexts = planned?.listItems ?? [];
-    let unnamedTextIndex = 0;
+    const textBoxes = slide.elements.filter(
+      (element): element is TextElement => element.type === 'text' && isRemixableTextElement(element),
+    );
+    const replacements = remix.slides[index].texts;
+    if (replacements.length !== textBoxes.length) {
+      throw new Error(`Remix text count does not match slide ${index + 1}`);
+    }
+    let textIndex = 0;
 
     return {
       ...slide,
       id: nanoid(10),
-      notes: planned?.purpose ?? slide.notes,
       elements: slide.elements.map((element) => {
         const id = nanoid(10);
-        if (element.type !== 'text' || !planned) return { ...element, id };
-
-        const name = element.name.toLowerCase();
-        if (/^(num text|number|quote mark|page number|logo|brand)/.test(name)) {
-          return { ...element, id };
-        }
-
-        let text: string | undefined;
-        const itemMatch = name.match(/^item\s+(\d+)$/);
-        if (itemMatch) text = itemTexts[Number(itemMatch[1]) - 1] ?? '';
-        else if (/^(title|headline|quote)$/.test(name)) text = planned.headline;
-        else if (name === 'author') text = planned.supportingText ?? element.text;
-        else if (name === 'subtitle' || name === 'body' || name === 'cta text') {
-          text = planned.bodyText;
-        } else {
-          const copy = [planned.headline, planned.bodyText, planned.supportingText, ...itemTexts]
-            .filter((value): value is string => Boolean(value));
-          text = copy[unnamedTextIndex++] ?? element.text;
-        }
-        return { ...element, id, text };
+        if (element.type !== 'text' || !isRemixableTextElement(element)) return { ...element, id };
+        return { ...element, id, text: replacements[textIndex++] };
       }),
     };
   });
@@ -43,7 +39,7 @@ export function assembleRemixedProject(plan: AIPlan, source: Project): Project {
   return {
     ...source,
     id: nanoid(10),
-    name: `${plan.title} (Remix)`,
+    name: `${remix.title} (Remix)`,
     slides,
     createdAt: Date.now(),
     updatedAt: Date.now(),

@@ -34,7 +34,7 @@ interface TemplateGalleryProps {
   customTemplates: CustomTemplate[];
   onFillTemplate: (template: CustomTemplate, data: TemplateData) => void;
   onEditTemplate: (template: CustomTemplate) => void;
-  onDeleteTemplate: (template: CustomTemplate) => void;
+  onDeleteTemplate: (template: CustomTemplate) => Promise<boolean>;
 }
 
 function getPlaceholderKeys(
@@ -274,9 +274,11 @@ export function TemplateGallery({
             <AlertDialogAction asChild>
               <Button
                 variant="destructive"
-                onClick={() => {
-                  if (templateToDelete) onDeleteTemplate(templateToDelete);
-                  setTemplateToDelete(null);
+                onClick={async (event) => {
+                  event.preventDefault();
+                  if (templateToDelete && await onDeleteTemplate(templateToDelete)) {
+                    setTemplateToDelete(null);
+                  }
                 }}
               >
                 Delete template

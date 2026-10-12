@@ -38,7 +38,7 @@ export function ResizeHandle({ position, onPointerDown }: ResizeHandleProps) {
         e.stopPropagation();
         onPointerDown(position, e);
       }}
-      className="absolute h-3.5 w-3.5 rounded-sm border-2 border-primary bg-background shadow-md transition-transform hover:scale-130 active:scale-110"
+      className="pointer-events-auto absolute h-3.5 w-3.5 rounded-sm border-2 border-primary bg-background shadow-md transition-transform hover:scale-130 active:scale-110"
       style={{
         ...POSITION_STYLES[position],
         cursor: CURSOR_MAP[position],
