@@ -20,6 +20,8 @@ export function createTextElement(partial: Partial<TextElement> & {
     fontStyle: 'normal',
     textDecoration: 'none',
     fill: '#1a1a2e',
+    stroke: '#000000',
+    strokeWidth: 0,
     align: 'center',
     verticalAlign: 'middle',
     lineHeight: 1.3,

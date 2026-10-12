@@ -363,6 +363,21 @@ export function TextProperties({ element, onUpdate }: TextPropertiesProps) {
         value={element.fill}
         onChange={(c) => onUpdate({ fill: c })}
       />
+      <div className="space-y-1.5">
+        <Label className="text-xs">Text Stroke ({element.strokeWidth ?? 0}px)</Label>
+        <Slider
+          value={[element.strokeWidth ?? 0]}
+          onValueChange={(value) => onUpdate({ strokeWidth: value[0] })}
+          min={0}
+          max={Math.max(30, element.strokeWidth ?? 0)}
+          step={1}
+        />
+        <ColorPicker
+          label="Stroke Color"
+          value={element.stroke ?? "#000000"}
+          onChange={(stroke) => onUpdate({ stroke })}
+        />
+      </div>
     </div>
   );
 }

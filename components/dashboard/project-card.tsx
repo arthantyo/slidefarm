@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { MouseEvent, PointerEvent } from "react";
 import type { Project, ProjectFolder } from "@/types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import {
   Folder,
   Pencil,
   Wand2,
+  Check,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -47,6 +49,9 @@ interface ProjectCardProps {
   onMoveToFolder: (folderId: string | null) => void;
   loading?: boolean;
   layout?: "card" | "list";
+  selected?: boolean;
+  selectionMode?: boolean;
+  onToggleSelected?: () => void;
 }
 
 export function ProjectCard({
@@ -60,7 +65,58 @@ export function ProjectCard({
   onMoveToFolder,
   loading = false,
   layout = "card",
+  selected = false,
+  selectionMode = false,
+  onToggleSelected,
 }: ProjectCardProps) {
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdTriggered = useRef(false);
+  const clearHold = () => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+  };
+  useEffect(() => clearHold, []);
+  const startHold = (event: PointerEvent<HTMLDivElement>) => {
+    if (loading || event.button !== 0 ||
+      (event.target as HTMLElement).closest("[data-card-menu], [data-select-control]")) return;
+    clearHold();
+    holdTriggered.current = false;
+    holdTimer.current = setTimeout(() => {
+      holdTriggered.current = true;
+      onToggleSelected?.();
+    }, 500);
+  };
+  const captureClick = (event: MouseEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest("[data-card-menu], [data-select-control]")) return;
+    if (holdTriggered.current) {
+      holdTriggered.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+    } else if (selectionMode || event.shiftKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      onToggleSelected?.();
+    }
+  };
+  const selectionProps = {
+    onPointerDown: startHold,
+    onPointerUp: clearHold,
+    onPointerCancel: clearHold,
+    onPointerLeave: clearHold,
+    onClickCapture: captureClick,
+    onContextMenu: (event: MouseEvent<HTMLDivElement>) => {
+      event.preventDefault();
+    },
+  };
+  const selectionIndicator = (
+    <button type="button" data-select-control onClick={onToggleSelected}
+      aria-label={`${selected ? "Deselect" : "Select"} ${project.name}`}
+      aria-pressed={selected}
+      title="Select project"
+      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${selected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground bg-background"} ${selectionMode ? "" : "opacity-60 hover:opacity-100 focus:opacity-100"}`}>
+      {selected && <Check className="h-4 w-4" />}
+    </button>
+  );
   const [renameOpen, setRenameOpen] = useState(false);
   const [projectName, setProjectName] = useState(project.name);
   const slideCount = project.slides.length;
@@ -79,6 +135,7 @@ export function ProjectCard({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
+          data-card-menu
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           aria-label={`Actions for ${project.name}`}
         >
@@ -213,7 +270,7 @@ export function ProjectCard({
   if (layout === "list") {
     const thumbWidth = Math.max(48, Math.min(112, Math.round(72 * aspectRatio)));
     return (
-      <Card className="group relative flex items-center gap-3 overflow-hidden p-2 pr-3 transition-all hover:border-primary/30 hover:shadow-md">
+      <Card {...selectionProps} aria-selected={selectionMode ? selected : undefined} className={`group relative flex items-center gap-3 overflow-hidden p-2 pr-3 transition-all hover:border-primary/30 hover:shadow-md ${selected ? "ring-2 ring-primary" : ""}`}>
         <button
           type="button"
           className="relative shrink-0 overflow-hidden rounded-md bg-muted"
@@ -238,6 +295,7 @@ export function ProjectCard({
             {slideCount} slide{slideCount !== 1 ? "s" : ""} · {project.dimensions.width}×{project.dimensions.height} · {lastUpdated}
           </p>
         </button>
+        {selectionIndicator}
         {menu}
         {renameDialog}
       </Card>
@@ -245,7 +303,7 @@ export function ProjectCard({
   }
 
   return (
-    <Card className="group relative overflow-hidden p-0 transition-all hover:shadow-lg hover:border-primary/30">
+    <Card {...selectionProps} aria-selected={selectionMode ? selected : undefined} className={`group relative overflow-hidden p-0 transition-all hover:shadow-lg hover:border-primary/30 ${selected ? "ring-2 ring-primary" : ""}`}>
       {/* Thumbnail */}
       <div
         className="relative cursor-pointer overflow-hidden bg-muted"
@@ -270,6 +328,7 @@ export function ProjectCard({
 
       {/* Info */}
       <div className="flex items-start justify-between gap-2 p-3">
+        {selectionIndicator}
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-semibold">{project.name}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">

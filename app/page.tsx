@@ -25,6 +25,8 @@ import {
   FolderPlus,
   Pencil,
   Trash2,
+  Copy,
+  X,
 } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -72,6 +74,9 @@ export default function DashboardPage() {
     renameFolder,
     deleteFolder,
     moveToFolder,
+    deleteMany,
+    duplicateMany,
+    moveManyToFolder,
   } = useProjectStore();
   const loadProject = useEditorStore((s) => s.loadProject);
   const customTemplates = useCustomTemplateStore((s) => s.templates);
@@ -91,6 +96,8 @@ export default function DashboardPage() {
   const [folderToDelete, setFolderToDelete] = useState<ProjectFolder | null>(
     null,
   );
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
@@ -119,6 +126,11 @@ export default function DashboardPage() {
     if (selectedFolderId === "unfiled") return !project.folderId;
     return project.folderId === selectedFolderId;
   });
+  const toggleProjectSelected = (id: string) => {
+    setSelectedProjectIds((current) => current.includes(id)
+      ? current.filter((selectedId) => selectedId !== id)
+      : [...current, id]);
+  };
   const selectedFolder = folders.find(
     (folder) => folder.id === selectedFolderId,
   );
@@ -284,6 +296,36 @@ export default function DashboardPage() {
           </TabsList>
 
           <TabsContent value="projects">
+            {selectedProjectIds.length > 0 && (
+              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 p-3" role="toolbar" aria-label="Selected project actions">
+                <span className="mr-2 text-sm font-medium">{selectedProjectIds.length} selected</span>
+                <Button size="sm" variant="outline" onClick={() => setSelectedProjectIds(visibleProjects.map((project) => project.id))}>
+                  Select all visible
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => {
+                  duplicateMany(selectedProjectIds);
+                  setSelectedProjectIds([]);
+                }} className="gap-1.5">
+                  <Copy className="h-4 w-4" /> Duplicate
+                </Button>
+                <Select onValueChange={(value) => {
+                  moveManyToFolder(selectedProjectIds, value === "unfiled" ? null : value);
+                  setSelectedProjectIds([]);
+                }}>
+                  <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Move to folder" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unfiled">Unfiled</SelectItem>
+                    {folders.map((folder) => <SelectItem key={folder.id} value={folder.id}>{folder.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button size="sm" variant="destructive" onClick={() => setConfirmBulkDelete(true)} className="gap-1.5">
+                  <Trash2 className="h-4 w-4" /> Delete
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setSelectedProjectIds([])} className="ml-auto gap-1.5">
+                  <X className="h-4 w-4" /> Cancel
+                </Button>
+              </div>
+            )}
             <div className="mb-5 flex flex-wrap items-center gap-2">
               <Select
                 value={selectedFolderId}
@@ -409,6 +451,9 @@ export default function DashboardPage() {
                     key={project.id}
                     project={project}
                     layout={projectView}
+                    selected={selectedProjectIds.includes(project.id)}
+                    selectionMode={selectedProjectIds.length > 0}
+                    onToggleSelected={() => toggleProjectSelected(project.id)}
                     onOpen={() => handleOpenProject(project.id)}
                     onDelete={() => handleDelete(project.id)}
                     onDuplicate={() => handleDuplicate(project.id)}
@@ -505,6 +550,26 @@ export default function DashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <AlertDialog
+        open={confirmBulkDelete}
+        onOpenChange={setConfirmBulkDelete}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedProjectIds.length} projects?</AlertDialogTitle>
+            <AlertDialogDescription>This permanently deletes the selected projects.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button variant="destructive" onClick={() => {
+                deleteMany(selectedProjectIds);
+                setSelectedProjectIds([]);
+              }}>Delete projects</Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog
         open={!!folderToDelete}
         onOpenChange={(open) => !open && setFolderToDelete(null)}

@@ -115,6 +115,12 @@ function renderTextElement(ctx: CanvasRenderingContext2D, el: TextElement) {
 
   ctx.font = `${fontStyle} ${fontWeight} ${el.fontSize}px "${el.fontFamily}", sans-serif`;
   ctx.fillStyle = el.fill;
+  const hasStroke = (el.strokeWidth ?? 0) > 0;
+  if (hasStroke) {
+    ctx.strokeStyle = el.stroke ?? "#000000";
+    ctx.lineWidth = el.strokeWidth!;
+    ctx.lineJoin = "round";
+  }
 
   if (el.shadow) {
     ctx.shadowColor = el.shadow.color;
@@ -163,10 +169,12 @@ function renderTextElement(ctx: CanvasRenderingContext2D, el: TextElement) {
 
     const lineY = startY + i * lineHeightPx;
     if (el.letterSpacing === 0) {
+      if (hasStroke) ctx.strokeText(line, lineX, lineY);
       ctx.fillText(line, lineX, lineY);
     } else {
       let characterX = lineX;
       for (const character of line) {
+        if (hasStroke) ctx.strokeText(character, characterX, lineY);
         ctx.fillText(character, characterX, lineY);
         characterX += ctx.measureText(character).width + el.letterSpacing;
       }

@@ -90,6 +90,8 @@ export function TextRenderer({
 
   const style: React.CSSProperties = {
     color: element.fill,
+    WebkitTextStroke: element.strokeWidth ? `${element.strokeWidth}px ${element.stroke ?? "#000000"}` : undefined,
+    paintOrder: "stroke fill",
     fontSize: `${element.fontSize}px`,
     fontFamily: element.fontFamily,
     fontWeight: getTextFontWeight(element),

@@ -53,10 +53,11 @@ function renderElementToSVG(el: CanvasElement, width: number, height: number): s
 
     const anchor = t.align === 'center' ? 'middle' : t.align === 'right' ? 'end' : 'start';
     const textX = t.align === 'center' ? t.x + t.width / 2 : t.align === 'right' ? t.x + t.width - padding : t.x + padding;
+    const stroke = t.strokeWidth ? ` stroke="${t.stroke ?? '#000000'}" stroke-width="${t.strokeWidth}" paint-order="stroke fill" stroke-linejoin="round"` : '';
 
     return `<g${transform}${opacity}>${lines.map((line, i) => {
       const y = startY + i * lineHeight;
-      return `<text x="${textX}" y="${y}" font-family="${t.fontFamily}" font-size="${t.fontSize}" font-weight="${fontWeight}" font-style="${fontStyleAttr}" fill="${t.fill}" text-anchor="${anchor}" letter-spacing="${t.letterSpacing}" dominant-baseline="hanging">${escapeXML(line)}</text>`;
+      return `<text x="${textX}" y="${y}" font-family="${t.fontFamily}" font-size="${t.fontSize}" font-weight="${fontWeight}" font-style="${fontStyleAttr}" fill="${t.fill}"${stroke} text-anchor="${anchor}" letter-spacing="${t.letterSpacing}" dominant-baseline="hanging">${escapeXML(line)}</text>`;
     }).join('')}</g>`;
   }
 

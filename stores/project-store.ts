@@ -14,10 +14,13 @@ interface ProjectStoreState {
   load: () => Promise<void>;
   save: (project: Project) => Promise<boolean>;
   delete: (projectId: string) => void;
+  deleteMany: (projectIds: string[]) => void;
   duplicate: (projectId: string) => Project | null;
+  duplicateMany: (projectIds: string[]) => void;
   get: (projectId: string) => Project | undefined;
   rename: (projectId: string, name: string) => void;
   moveToFolder: (projectId: string, folderId: string | null) => void;
+  moveManyToFolder: (projectIds: string[], folderId: string | null) => void;
   createFolder: (name: string) => ProjectFolder | null;
   renameFolder: (folderId: string, name: string) => void;
   deleteFolder: (folderId: string) => void;
@@ -116,6 +119,13 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     void writeLocal(updated, get().folders, (storageError) => set({ storageError }));
   },
 
+  deleteMany: (projectIds) => {
+    const selected = new Set(projectIds);
+    const updated = get().projects.filter((project) => !selected.has(project.id));
+    set({ projects: updated });
+    void writeLocal(updated, get().folders, (storageError) => set({ storageError }));
+  },
+
   duplicate: (projectId) => {
     const { projects } = get();
     const original = projects.find((p) => p.id === projectId);
@@ -131,6 +141,21 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     set({ projects: updated });
     void writeLocal(updated, get().folders, (storageError) => set({ storageError }));
     return cloned;
+  },
+
+  duplicateMany: (projectIds) => {
+    const selected = new Set(projectIds);
+    const copies = get().projects.filter((project) => selected.has(project.id)).map((project) => ({
+      ...JSON.parse(JSON.stringify(project)) as Project,
+      id: nanoid(10),
+      name: `${project.name} (copy)`,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }));
+    if (!copies.length) return;
+    const updated = [...get().projects, ...copies];
+    set({ projects: updated });
+    void writeLocal(updated, get().folders, (storageError) => set({ storageError }));
   },
 
   get: (projectId) => {
@@ -160,6 +185,17 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     );
     set({ projects: updated });
     void writeLocal(updated, get().folders, (storageError) => set({ storageError }));
+  },
+
+  moveManyToFolder: (projectIds, folderId) => {
+    const { projects, folders } = get();
+    if (folderId && !folders.some((folder) => folder.id === folderId)) return;
+    const selected = new Set(projectIds);
+    const updated = projects.map((project) => selected.has(project.id)
+      ? { ...project, folderId, updatedAt: Date.now() }
+      : project);
+    set({ projects: updated });
+    void writeLocal(updated, folders, (storageError) => set({ storageError }));
   },
 
   createFolder: (name) => {

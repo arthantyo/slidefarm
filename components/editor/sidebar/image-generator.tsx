@@ -5,8 +5,8 @@ import { Loader2, BookmarkPlus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { readSavedImagePrompts, SAVED_IMAGE_PROMPTS_EVENT, SAVED_IMAGE_PROMPTS_KEY } from '@/lib/canvas/saved-image-prompts';
 
-const STORAGE_KEY = 'slidefarm:saved-image-prompts';
 
 interface ImageGeneratorProps {
   width: number;
@@ -17,21 +17,30 @@ interface ImageGeneratorProps {
 export function ImageGenerator({ width, height, onAdd }: ImageGeneratorProps) {
   const [prompt, setPrompt] = useState('');
   const [savedPrompts, setSavedPrompts] = useState<string[]>([]);
+  const [generatedImages, setGeneratedImages] = useState<{ src: string; prompt: string }[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      if (Array.isArray(stored)) setSavedPrompts(stored.filter((item): item is string => typeof item === 'string'));
-    } catch {
-      // Ignore invalid local data.
-    }
+    setSavedPrompts(readSavedImagePrompts());
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/generated-images', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Could not load generated images.');
+        return response.json() as Promise<{ images: { src: string; prompt: string }[] }>;
+      })
+      .then((data) => { if (active) setGeneratedImages(data.images); })
+      .catch(() => { if (active) setError('Could not load generated images.'); });
+    return () => { active = false; };
   }, []);
 
   const updateSavedPrompts = (next: string[]) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(SAVED_IMAGE_PROMPTS_KEY, JSON.stringify(next));
+      window.dispatchEvent(new Event(SAVED_IMAGE_PROMPTS_EVENT));
       setSavedPrompts(next);
       setError(null);
     } catch {
@@ -59,6 +68,13 @@ export function ImageGenerator({ width, height, onAdd }: ImageGeneratorProps) {
       const result = await response.json() as { src?: string; error?: string };
       if (!response.ok || !result.src) throw new Error(result.error || 'Image generation failed.');
       onAdd(result.src, value);
+      const saveResponse = await fetch('/api/generated-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ src: result.src, prompt: value }),
+      });
+      if (!saveResponse.ok) throw new Error('Image added, but could not save it to the gallery.');
+      setGeneratedImages((images) => [{ src: result.src!, prompt: value }, ...images]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Image generation failed.');
     } finally {
@@ -101,6 +117,26 @@ export function ImageGenerator({ width, height, onAdd }: ImageGeneratorProps) {
               </Button>
             </div>
           ))}
+        </div>
+      )}
+      {generatedImages.length > 0 && (
+        <div className="space-y-2 pt-2">
+          <h4 className="text-xs font-medium text-muted-foreground">Generated images</h4>
+          <div className="columns-2 gap-2">
+            {generatedImages.map(({ src, prompt }) => (
+              <button
+                key={src}
+                type="button"
+                onClick={() => onAdd(src, prompt)}
+                title={`Add image: ${prompt}`}
+                aria-label={`Add generated image: ${prompt}`}
+                className="mb-2 block w-full break-inside-avoid overflow-hidden rounded border border-border transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt={prompt} loading="lazy" className="block h-auto w-full" />
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -42,6 +42,8 @@ export interface TextElement extends BaseElement {
   fontWeight?: number;
   textDecoration: 'none' | 'underline' | 'line-through';
   fill: string;
+  stroke?: string;
+  strokeWidth?: number;
   align: TextAlign;
   verticalAlign: VerticalAlign;
   lineHeight: number;
@@ -61,8 +63,10 @@ export interface TextElement extends BaseElement {
 
 export interface ImageElement extends BaseElement {
   type: 'image';
-  /** Template placeholder key — marks this as an image slot the user fills manually */
+  /** Template placeholder key; in AI mode its value is the image subject. */
   placeholder?: string;
+  /** Base prompt prepended to the workflow-provided subject. */
+  aiPlaceholderPrompt?: string;
   src: string;
   imagePrompt?: string;
   objectFit: 'cover' | 'contain' | 'fill';
@@ -184,6 +188,33 @@ export interface Project {
 export interface ProjectFolder {
   id: string;
   name: string;
+  createdAt: number;
+}
+
+export interface Workflow {
+  id: string;
+  name: string;
+  nodes?: Array<'source' | 'template' | 'project' | 'export' | `export:${string}`>;
+  nodePositions?: Partial<Record<'source' | 'template' | 'project' | 'export' | `export:${string}`, { x: number; y: number }>>;
+  connections?: Array<{ from: 'source' | 'template' | 'project' | 'export' | `export:${string}`; to: 'source' | 'template' | 'project' | 'export' | `export:${string}` }>;
+  exportFormats?: Record<string, 'zip' | 'pdf' | 'png' | 'jpg'>;
+  projectFolderId?: string | null;
+  pendingProjectId?: string | null;
+  sourceType: 'json' | 'ai';
+  sourceJson: string;
+  systemPrompt: string;
+  templateId: string;
+  exportFormat: 'zip' | 'pdf' | 'png' | 'jpg';
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface WorkflowMedia {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  projectName: string;
+  format: Workflow['exportFormat'];
   createdAt: number;
 }
 

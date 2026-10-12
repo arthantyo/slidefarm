@@ -65,6 +65,8 @@ function renderElement(el: CanvasElement, key: string, scale: number): React.Rea
           alignItems: t.verticalAlign === 'middle' ? 'center' : t.verticalAlign === 'bottom' ? 'flex-end' : 'flex-start',
           justifyContent: t.align === 'center' ? 'center' : t.align === 'right' ? 'flex-end' : 'flex-start',
           color: t.fill,
+          WebkitTextStroke: t.strokeWidth ? `${t.strokeWidth * scale}px ${t.stroke ?? '#000000'}` : undefined,
+          paintOrder: 'stroke fill',
           fontSize: t.fontSize * scale,
           fontFamily: t.fontFamily,
           fontStyle: isTextItalic(t) ? 'italic' : 'normal',

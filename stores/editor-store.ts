@@ -272,7 +272,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     get().pushHistory();
     get().updateSlide(currentSlideId, (slide) => ({
       ...slide,
-      elements: [...slide.elements, element],
+      elements: element.type === 'image'
+        ? (() => {
+            const elements = [...slide.elements];
+            const firstContentIndex = elements.findIndex((item) => item.type !== 'background');
+            elements.splice(firstContentIndex === -1 ? elements.length : firstContentIndex, 0, element);
+            return elements;
+          })()
+        : [...slide.elements, element],
     }));
     set({ selectedElementIds: [element.id] });
   },
