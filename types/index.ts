@@ -1,0 +1,255 @@
+import { z } from 'zod';
+
+// ─── Element Types ───────────────────────────────────────────────────────────
+
+export type ElementType = 'text' | 'image' | 'shape' | 'background';
+
+export type ShapeKind = 'rect' | 'ellipse' | 'triangle' | 'line' | 'star' | 'polygon';
+
+export type FontStyle = 'normal' | 'bold' | 'italic' | 'bold-italic';
+
+export type TextAlign = 'left' | 'center' | 'right';
+
+export type VerticalAlign = 'top' | 'middle' | 'bottom';
+
+// ─── Base Element ────────────────────────────────────────────────────────────
+
+export interface BaseElement {
+  id: string;
+  type: ElementType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  opacity: number;
+  locked: boolean;
+  visible: boolean;
+  name: string;
+}
+
+// ─── Text Element ────────────────────────────────────────────────────────────
+
+export interface TextElement extends BaseElement {
+  type: 'text';
+  text: string;
+  fontSize: number;
+  fontFamily: string;
+  fontStyle: FontStyle;
+  textDecoration: 'none' | 'underline' | 'line-through';
+  fill: string;
+  align: TextAlign;
+  verticalAlign: VerticalAlign;
+  lineHeight: number;
+  letterSpacing: number;
+  wrap: 'word' | 'none';
+  padding: number;
+  shadow?: {
+    color: string;
+    blur: number;
+    offsetX: number;
+    offsetY: number;
+    opacity: number;
+  } | null;
+}
+
+// ─── Image Element ───────────────────────────────────────────────────────────
+
+export interface ImageElement extends BaseElement {
+  type: 'image';
+  src: string;
+  imagePrompt?: string;
+  objectFit: 'cover' | 'contain' | 'fill';
+  cornerRadius: number;
+  shadow?: {
+    color: string;
+    blur: number;
+    offsetX: number;
+    offsetY: number;
+    opacity: number;
+  } | null;
+}
+
+// ─── Shape Element ───────────────────────────────────────────────────────────
+
+export interface ShapeElement extends BaseElement {
+  type: 'shape';
+  shape: ShapeKind;
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+  cornerRadius: number;
+  points?: number[];
+  sides?: number;
+  shadow?: {
+    color: string;
+    blur: number;
+    offsetX: number;
+    offsetY: number;
+    opacity: number;
+  } | null;
+}
+
+// ─── Background Element ──────────────────────────────────────────────────────
+
+export interface BackgroundElement extends BaseElement {
+  type: 'background';
+  fillType: 'solid' | 'gradient';
+  fill: string;
+  gradientColor2?: string;
+  gradientAngle?: number;
+}
+
+// ─── Discriminated Union ─────────────────────────────────────────────────────
+
+export type CanvasElement = TextElement | ImageElement | ShapeElement | BackgroundElement;
+
+// ─── Slide ───────────────────────────────────────────────────────────────────
+
+export type SlideType =
+  | 'cover'
+  | 'text-focused'
+  | 'image-focused'
+  | 'text-and-image'
+  | 'quote'
+  | 'numbered-list'
+  | 'comparison'
+  | 'step-by-step'
+  | 'timeline'
+  | 'statistics'
+  | 'call-to-action'
+  | 'custom';
+
+export interface Slide {
+  id: string;
+  type: SlideType;
+  name: string;
+  elements: CanvasElement[];
+  notes?: string;
+}
+
+// ─── Theme ───────────────────────────────────────────────────────────────────
+
+export interface Theme {
+  primary: string;
+  secondary: string;
+  accent: string;
+  background: string;
+  text: string;
+  textMuted: string;
+  fontHeading: string;
+  fontBody: string;
+}
+
+// ─── Brand Kit ───────────────────────────────────────────────────────────────
+
+export interface BrandKit {
+  name: string;
+  logo?: string | null;
+  colors: string[];
+  fonts: string[];
+  defaultCTA?: string;
+  illustrationStyle?: string;
+}
+
+// ─── Project ─────────────────────────────────────────────────────────────────
+
+export type AspectRatioKey = '9:16' | '4:5' | '1:1' | '16:9' | 'custom';
+
+export interface ProjectDimensions {
+  width: number;
+  height: number;
+  aspectRatio: AspectRatioKey;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  dimensions: ProjectDimensions;
+  slides: Slide[];
+  theme: Theme;
+  brandKit?: BrandKit | null;
+  createdAt: number;
+  updatedAt: number;
+  thumbnail?: string | null;
+}
+
+// ─── Templates ───────────────────────────────────────────────────────────────
+
+export interface Template {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  dimensions: ProjectDimensions;
+  theme: Theme;
+  slides: Slide[];
+  thumbnail?: string | null;
+}
+
+// ─── Platform Presets ────────────────────────────────────────────────────────
+
+export interface PlatformPreset {
+  key: string;
+  label: string;
+  aspectRatio: AspectRatioKey;
+  width: number;
+  height: number;
+}
+
+export const PLATFORM_PRESETS: PlatformPreset[] = [
+  { key: 'tiktok', label: 'TikTok / Reels', aspectRatio: '9:16', width: 1080, height: 1920 },
+  { key: 'instagram-story', label: 'Instagram Story', aspectRatio: '9:16', width: 1080, height: 1920 },
+  { key: 'instagram-post', label: 'Instagram Post', aspectRatio: '1:1', width: 1080, height: 1080 },
+  { key: 'instagram-carousel', label: 'Instagram Carousel', aspectRatio: '4:5', width: 1080, height: 1350 },
+  { key: 'linkedin', label: 'LinkedIn', aspectRatio: '1:1', width: 1080, height: 1080 },
+  { key: 'youtube-thumbnail', label: 'YouTube Thumbnail', aspectRatio: '16:9', width: 1920, height: 1080 },
+  { key: 'presentation', label: 'Presentation', aspectRatio: '16:9', width: 1920, height: 1080 },
+  { key: 'custom', label: 'Custom', aspectRatio: 'custom', width: 1080, height: 1080 },
+];
+
+// ─── AI Generation Types ─────────────────────────────────────────────────────
+
+export type Tone = 'educational' | 'casual' | 'professional' | 'persuasive' | 'inspirational';
+export type ContentDensity = 'concise' | 'balanced' | 'detailed';
+export type VisualStyle =
+  | 'minimalist-vector'
+  | 'monochrome-silhouette'
+  | 'flat-illustration'
+  | 'editorial-illustration'
+  | 'photorealistic'
+  | '3d'
+  | 'watercolor'
+  | 'cartoon'
+  | 'abstract'
+  | 'custom';
+
+export interface GenerationOptions {
+  prompt: string;
+  slideCount?: number | 'auto';
+  platform?: string;
+  aspectRatio?: AspectRatioKey;
+  tone?: Tone;
+  contentDensity?: ContentDensity;
+  language?: string;
+  visualStyle?: VisualStyle;
+  customInstructions?: string;
+}
+
+export interface AIPlannedSlide {
+  type: SlideType;
+  purpose: string;
+  headline: string;
+  bodyText: string;
+  supportingText?: string;
+  listItems?: string[];
+  visualSuggestion?: string;
+  imagePrompt?: string;
+  citation?: string;
+}
+
+export interface AIPlan {
+  title: string;
+  slides: AIPlannedSlide[];
+  suggestedTheme: Partial<Theme>;
+}
