@@ -5,13 +5,14 @@ import type {
   TextElement,
   ImageElement,
   ShapeElement,
-} from '@/types';
-import { getWrappedLines } from './text-wrap';
+} from "@/types";
+import { getWrappedLines } from "./text-wrap";
+import { loadFont } from "../font-loader";
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
     img.src = src;
@@ -22,19 +23,21 @@ export async function renderSlideToCanvas(
   slide: Slide,
   canvas: HTMLCanvasElement,
   width: number,
-  height: number
+  height: number,
 ): Promise<void> {
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Could not get 2D context');
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not get 2D context");
 
   ctx.clearRect(0, 0, width, height);
 
   // 1. Draw Background
-  const bg = slide.elements.find((el) => el.type === 'background') as BackgroundElement | undefined;
+  const bg = slide.elements.find((el) => el.type === "background") as
+    | BackgroundElement
+    | undefined;
   if (bg) {
-    if (bg.fillType === 'gradient' && bg.gradientColor2) {
+    if (bg.fillType === "gradient" && bg.gradientColor2) {
       const angleRad = ((bg.gradientAngle ?? 135) * Math.PI) / 180;
       const x2 = width * Math.cos(angleRad);
       const y2 = height * Math.sin(angleRad);
@@ -43,14 +46,33 @@ export async function renderSlideToCanvas(
       grad.addColorStop(1, bg.gradientColor2);
       ctx.fillStyle = grad;
     } else {
-      ctx.fillStyle = bg.fill || '#ffffff';
+      ctx.fillStyle = bg.fill || "#ffffff";
     }
     ctx.fillRect(0, 0, width, height);
   }
 
   // 2. Preload all visible images
-  const otherElements = slide.elements.filter((el) => el.type !== 'background' && el.visible);
-  const imageElements = otherElements.filter((el) => el.type === 'image') as ImageElement[];
+  const otherElements = slide.elements.filter(
+    (el) => el.type !== "background" && el.visible,
+  );
+  await Promise.all(
+    otherElements
+      .filter((el): el is TextElement => el.type === "text")
+      .map((el) => {
+        const isBold =
+          el.fontStyle === "bold" || el.fontStyle === "bold-italic";
+        const isItalic =
+          el.fontStyle === "italic" || el.fontStyle === "bold-italic";
+        return loadFont(
+          el.fontFamily,
+          isBold ? "bold" : "normal",
+          isItalic ? "italic" : "normal",
+        ).catch(() => undefined);
+      }),
+  );
+  const imageElements = otherElements.filter(
+    (el) => el.type === "image",
+  ) as ImageElement[];
   const loadedImages = new Map<string, HTMLImageElement>();
 
   await Promise.all(
@@ -61,7 +83,7 @@ export async function renderSlideToCanvas(
       } catch {
         // Continue even if an image fails to load
       }
-    })
+    }),
   );
 
   // 3. Draw Elements in order
@@ -78,11 +100,11 @@ export async function renderSlideToCanvas(
       ctx.translate(-cx, -cy);
     }
 
-    if (el.type === 'text') {
+    if (el.type === "text") {
       renderTextElement(ctx, el as TextElement);
-    } else if (el.type === 'image') {
+    } else if (el.type === "image") {
       renderImageElement(ctx, el as ImageElement, loadedImages.get(el.id));
-    } else if (el.type === 'shape') {
+    } else if (el.type === "shape") {
       renderShapeElement(ctx, el as ShapeElement);
     }
 
@@ -91,10 +113,10 @@ export async function renderSlideToCanvas(
 }
 
 function renderTextElement(ctx: CanvasRenderingContext2D, el: TextElement) {
-  const isBold = el.fontStyle === 'bold' || el.fontStyle === 'bold-italic';
-  const isItalic = el.fontStyle === 'italic' || el.fontStyle === 'bold-italic';
-  const fontWeight = isBold ? 'bold' : 'normal';
-  const fontStyle = isItalic ? 'italic' : 'normal';
+  const isBold = el.fontStyle === "bold" || el.fontStyle === "bold-italic";
+  const isItalic = el.fontStyle === "italic" || el.fontStyle === "bold-italic";
+  const fontWeight = isBold ? "bold" : "normal";
+  const fontStyle = isItalic ? "italic" : "normal";
 
   ctx.font = `${fontStyle} ${fontWeight} ${el.fontSize}px "${el.fontFamily}", sans-serif`;
   ctx.fillStyle = el.fill;
@@ -117,7 +139,7 @@ function renderTextElement(ctx: CanvasRenderingContext2D, el: TextElement) {
     el.fontSize,
     fontWeight,
     fontStyle,
-    el.letterSpacing
+    el.letterSpacing,
   );
 
   const lineHeightPx = el.fontSize * (el.lineHeight || 1.3);
@@ -125,13 +147,13 @@ function renderTextElement(ctx: CanvasRenderingContext2D, el: TextElement) {
   const availableHeight = Math.max(10, el.height - padding * 2);
 
   let startY = el.y + padding;
-  if (el.verticalAlign === 'middle') {
+  if (el.verticalAlign === "middle") {
     startY = el.y + padding + (availableHeight - totalTextHeight) / 2;
-  } else if (el.verticalAlign === 'bottom') {
+  } else if (el.verticalAlign === "bottom") {
     startY = el.y + el.height - padding - totalTextHeight;
   }
 
-  ctx.textBaseline = 'top';
+  ctx.textBaseline = "top";
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -139,19 +161,29 @@ function renderTextElement(ctx: CanvasRenderingContext2D, el: TextElement) {
     const lineW = lineMetrics.width;
 
     let lineX = el.x + padding;
-    if (el.align === 'center') {
+    if (el.align === "center") {
       lineX = el.x + padding + (maxWidth - lineW) / 2;
-    } else if (el.align === 'right') {
+    } else if (el.align === "right") {
       lineX = el.x + el.width - padding - lineW;
     }
 
     const lineY = startY + i * lineHeightPx;
     ctx.fillText(line, lineX, lineY);
 
-    if (el.textDecoration === 'underline') {
-      ctx.fillRect(lineX, lineY + el.fontSize * 1.05, lineW, Math.max(1, el.fontSize * 0.07));
-    } else if (el.textDecoration === 'line-through') {
-      ctx.fillRect(lineX, lineY + el.fontSize * 0.55, lineW, Math.max(1, el.fontSize * 0.07));
+    if (el.textDecoration === "underline") {
+      ctx.fillRect(
+        lineX,
+        lineY + el.fontSize * 1.05,
+        lineW,
+        Math.max(1, el.fontSize * 0.07),
+      );
+    } else if (el.textDecoration === "line-through") {
+      ctx.fillRect(
+        lineX,
+        lineY + el.fontSize * 0.55,
+        lineW,
+        Math.max(1, el.fontSize * 0.07),
+      );
     }
   }
 }
@@ -159,7 +191,7 @@ function renderTextElement(ctx: CanvasRenderingContext2D, el: TextElement) {
 function renderImageElement(
   ctx: CanvasRenderingContext2D,
   el: ImageElement,
-  img?: HTMLImageElement
+  img?: HTMLImageElement,
 ) {
   if (!img) return;
 
@@ -170,14 +202,17 @@ function renderImageElement(
     ctx.clip();
   }
 
-  if (el.objectFit === 'contain') {
-    const scale = Math.min(el.width / img.naturalWidth, el.height / img.naturalHeight);
+  if (el.objectFit === "contain") {
+    const scale = Math.min(
+      el.width / img.naturalWidth,
+      el.height / img.naturalHeight,
+    );
     const dw = img.naturalWidth * scale;
     const dh = img.naturalHeight * scale;
     const dx = el.x + (el.width - dw) / 2;
     const dy = el.y + (el.height - dh) / 2;
     ctx.drawImage(img, dx, dy, dw, dh);
-  } else if (el.objectFit === 'cover') {
+  } else if (el.objectFit === "cover") {
     const imgRatio = img.naturalWidth / img.naturalHeight;
     const boxRatio = el.width / el.height;
     let sx = 0;
@@ -207,13 +242,13 @@ function renderShapeElement(ctx: CanvasRenderingContext2D, el: ShapeElement) {
   }
 
   ctx.beginPath();
-  if (el.shape === 'rect') {
+  if (el.shape === "rect") {
     if (el.cornerRadius > 0) {
       ctx.roundRect(el.x, el.y, el.width, el.height, el.cornerRadius);
     } else {
       ctx.rect(el.x, el.y, el.width, el.height);
     }
-  } else if (el.shape === 'ellipse') {
+  } else if (el.shape === "ellipse") {
     ctx.ellipse(
       el.x + el.width / 2,
       el.y + el.height / 2,
@@ -221,32 +256,32 @@ function renderShapeElement(ctx: CanvasRenderingContext2D, el: ShapeElement) {
       el.height / 2,
       0,
       0,
-      2 * Math.PI
+      2 * Math.PI,
     );
-  } else if (el.shape === 'triangle') {
+  } else if (el.shape === "triangle") {
     ctx.moveTo(el.x + el.width / 2, el.y);
     ctx.lineTo(el.x + el.width, el.y + el.height);
     ctx.lineTo(el.x, el.y + el.height);
     ctx.closePath();
-  } else if (el.shape === 'line') {
+  } else if (el.shape === "line") {
     ctx.moveTo(el.x, el.y + el.height / 2);
     ctx.lineTo(el.x + el.width, el.y + el.height / 2);
-    ctx.strokeStyle = el.fill || el.stroke || '#6366f1';
+    ctx.strokeStyle = el.fill || el.stroke || "#6366f1";
     ctx.lineWidth = el.strokeWidth || 4;
-    ctx.lineCap = 'round';
+    ctx.lineCap = "round";
     ctx.stroke();
     return;
   } else {
     // Star or regular polygon
-    const sides = el.shape === 'star' ? 5 : el.sides ?? 5;
+    const sides = el.shape === "star" ? 5 : (el.sides ?? 5);
     const cx = el.x + el.width / 2;
     const cy = el.y + el.height / 2;
     const outerR = Math.min(el.width, el.height) / 2;
     const innerR = outerR * 0.45;
-    const count = el.shape === 'star' ? sides * 2 : sides;
+    const count = el.shape === "star" ? sides * 2 : sides;
 
     for (let i = 0; i < count; i++) {
-      const r = el.shape === 'star' ? (i % 2 === 0 ? outerR : innerR) : outerR;
+      const r = el.shape === "star" ? (i % 2 === 0 ? outerR : innerR) : outerR;
       const angle = (i * 2 * Math.PI) / count - Math.PI / 2;
       const px = cx + r * Math.cos(angle);
       const py = cy + r * Math.sin(angle);

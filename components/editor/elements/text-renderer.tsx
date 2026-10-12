@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
-import React, { useState, useRef, useEffect } from 'react';
-import type { TextElement } from '@/types';
+import React, { useState, useRef, useEffect } from "react";
+import type { TextElement } from "@/types";
+import { loadFont } from "@/lib/font-loader";
 
 interface TextRendererProps {
   element: TextElement;
@@ -9,7 +10,11 @@ interface TextRendererProps {
   onUpdate: (updates: Partial<TextElement>) => void;
 }
 
-export function TextRenderer({ element, isSelected, onUpdate }: TextRendererProps) {
+export function TextRenderer({
+  element,
+  isSelected,
+  onUpdate,
+}: TextRendererProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(element.text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -17,6 +22,18 @@ export function TextRenderer({ element, isSelected, onUpdate }: TextRendererProp
   useEffect(() => {
     setEditText(element.text);
   }, [element.text]);
+
+  useEffect(() => {
+    const isBold =
+      element.fontStyle === "bold" || element.fontStyle === "bold-italic";
+    const isItalic =
+      element.fontStyle === "italic" || element.fontStyle === "bold-italic";
+    void loadFont(
+      element.fontFamily,
+      isBold ? "bold" : "normal",
+      isItalic ? "italic" : "normal",
+    ).catch(() => undefined);
+  }, [element.fontFamily, element.fontStyle]);
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -32,8 +49,10 @@ export function TextRenderer({ element, isSelected, onUpdate }: TextRendererProp
     }
   };
 
-  const isBold = element.fontStyle === 'bold' || element.fontStyle === 'bold-italic';
-  const isItalic = element.fontStyle === 'italic' || element.fontStyle === 'bold-italic';
+  const isBold =
+    element.fontStyle === "bold" || element.fontStyle === "bold-italic";
+  const isItalic =
+    element.fontStyle === "italic" || element.fontStyle === "bold-italic";
 
   const shadowCss = element.shadow
     ? `${element.shadow.offsetX}px ${element.shadow.offsetY}px ${element.shadow.blur}px ${element.shadow.color}`
@@ -43,24 +62,24 @@ export function TextRenderer({ element, isSelected, onUpdate }: TextRendererProp
     color: element.fill,
     fontSize: `${element.fontSize}px`,
     fontFamily: element.fontFamily,
-    fontWeight: isBold ? 'bold' : 'normal',
-    fontStyle: isItalic ? 'italic' : 'normal',
+    fontWeight: isBold ? "bold" : "normal",
+    fontStyle: isItalic ? "italic" : "normal",
     textDecoration: element.textDecoration,
     textAlign: element.align,
     lineHeight: element.lineHeight,
     letterSpacing: `${element.letterSpacing}px`,
     padding: `${element.padding}px`,
     textShadow: shadowCss,
-    whiteSpace: 'pre-wrap',
-    wordBreak: element.wrap === 'word' ? 'break-word' : 'normal',
+    whiteSpace: "pre-wrap",
+    wordBreak: element.wrap === "word" ? "break-word" : "normal",
   };
 
   const verticalAlignClass =
-    element.verticalAlign === 'middle'
-      ? 'items-center'
-      : element.verticalAlign === 'bottom'
-      ? 'items-end'
-      : 'items-start';
+    element.verticalAlign === "middle"
+      ? "items-center"
+      : element.verticalAlign === "bottom"
+        ? "items-end"
+        : "items-start";
 
   if (isEditing) {
     return (
@@ -71,7 +90,7 @@ export function TextRenderer({ element, isSelected, onUpdate }: TextRendererProp
           onChange={(e) => setEditText(e.target.value)}
           onBlur={handleFinishEditing}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') {
+            if (e.key === "Escape") {
               e.stopPropagation();
               handleFinishEditing();
             }
@@ -95,16 +114,18 @@ export function TextRenderer({ element, isSelected, onUpdate }: TextRendererProp
       className={`flex h-full w-full select-none overflow-hidden ${verticalAlignClass}`}
       style={{
         justifyContent:
-          element.align === 'center'
-            ? 'center'
-            : element.align === 'right'
-            ? 'flex-end'
-            : 'flex-start',
+          element.align === "center"
+            ? "center"
+            : element.align === "right"
+              ? "flex-end"
+              : "flex-start",
       }}
-      title={isSelected ? 'Double-click to edit text' : undefined}
+      title={isSelected ? "Double-click to edit text" : undefined}
     >
       <div style={style} className="w-full">
-        {element.text || <span className="opacity-40">Double-click to edit</span>}
+        {element.text || (
+          <span className="opacity-40">Double-click to edit</span>
+        )}
       </div>
     </div>
   );
