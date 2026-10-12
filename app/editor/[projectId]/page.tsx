@@ -144,7 +144,22 @@ export default function EditorPage() {
               theme={project.theme}
               zoom={zoom}
               selectedElementIds={selectedElementIds}
-              onSelectElement={(id) => useEditorStore.getState().selectElement(id)}
+              onSelectElement={(id, addToSelection) => {
+                const store = useEditorStore.getState();
+                if (!id) {
+                  store.selectElement(null);
+                } else if (addToSelection) {
+                  const current = store.selectedElementIds;
+                  if (current.includes(id)) {
+                    // Deselect that one element
+                    store.selectMultiple(current.filter((x) => x !== id));
+                  } else {
+                    store.selectMultiple([...current, id]);
+                  }
+                } else {
+                  store.selectElement(id);
+                }
+              }}
               onUpdateElement={(id, updates) => useEditorStore.getState().updateElement(id, updates)}
               onDeselectAll={() => useEditorStore.getState().selectElement(null)}
             />

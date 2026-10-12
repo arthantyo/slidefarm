@@ -11,7 +11,7 @@ interface CanvasStageWrapperProps {
   theme: Theme;
   zoom: number;
   selectedElementIds: string[];
-  onSelectElement: (id: string | null) => void;
+  onSelectElement: (id: string | null, addToSelection?: boolean) => void;
   onUpdateElement: (id: string, updates: Partial<CanvasElement>) => void;
   onDeselectAll: () => void;
 }

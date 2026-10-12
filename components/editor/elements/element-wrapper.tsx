@@ -9,7 +9,7 @@ import { ShapeRenderer } from './shape-renderer';
 interface ElementWrapperProps {
   element: CanvasElement;
   isSelected: boolean;
-  onSelect: (id: string, e: React.PointerEvent) => void;
+  onSelect: (id: string, addToSelection: boolean) => void;
   onUpdate: (id: string, updates: Partial<CanvasElement>) => void;
 }
 
@@ -27,7 +27,7 @@ export function ElementWrapper({
     // Left click only
     if (e.button !== 0) return;
     e.stopPropagation();
-    onSelect(element.id, e);
+    onSelect(element.id, e.shiftKey || e.metaKey);
   };
 
   const transform = element.rotation ? `rotate(${element.rotation}deg)` : undefined;

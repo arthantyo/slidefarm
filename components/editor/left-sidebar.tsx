@@ -4,17 +4,17 @@ import { useState } from 'react';
 import { useEditorStore } from '@/stores/editor-store';
 import { createTextElement, createShapeElement, createImageElement } from '@/lib/canvas/element-factory';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
   Type, Image as ImageIcon, Shapes, Upload, Layers,
   Square, Circle, Triangle as TriangleIcon, Star, Minus,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import type { ShapeKind, TextElement, ShapeElement } from '@/types';
+import type { ShapeKind } from '@/types';
 import { FONT_OPTIONS, COLOR_PALETTE } from '@/lib/canvas/themes';
-import { nanoid } from 'nanoid';
 import { ImageUrlInput, FileUpload } from './sidebar/image-upload-tab';
+import { SlideThumbnail } from './slide-thumbnail';
 
 type Tab = 'slides' | 'text' | 'shapes' | 'images' | 'uploads' | 'ai' | 'templates';
 
@@ -24,8 +24,9 @@ interface LeftSidebarProps {
 
 export function LeftSidebar({ onOpenGenerator }: LeftSidebarProps) {
   const [tab, setTab] = useState<Tab>('slides');
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const { project, currentSlideId } = useEditorStore();
-  const { addElement, addSlide, setCurrentSlide, deleteSlide, duplicateSlide, reorderSlides } = useEditorStore();
+  const { addElement, addSlide, setCurrentSlide, deleteSlide, duplicateSlide } = useEditorStore();
 
   if (!project) return null;
 
@@ -92,205 +93,205 @@ export function LeftSidebar({ onOpenGenerator }: LeftSidebarProps) {
 
   return (
     <div className="flex h-full">
-      {/* Tab icons */}
-      <div className="flex w-16 flex-col items-center gap-1 border-r border-border bg-card py-3">
+      {/* Icon rail */}
+      <div className="flex w-16 flex-shrink-0 flex-col items-center gap-1 border-r border-border bg-card py-3">
         {tabs.map(({ key, icon: Icon, label }) => (
           <button
             key={key}
-            onClick={() => setTab(key)}
+            onClick={() => {
+              if (isCollapsed) {
+                setIsCollapsed(false);
+                setTab(key);
+              } else {
+                setTab(key === tab && !isCollapsed ? tab : key);
+              }
+            }}
             className={`flex w-14 flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-medium transition-colors ${
-              tab === key ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+              tab === key && !isCollapsed ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'
             }`}
           >
             <Icon className="h-5 w-5" />
             {label}
           </button>
         ))}
+
+        {/* Collapse toggle at the bottom */}
+        <div className="mt-auto">
+          <button
+            onClick={() => setIsCollapsed((v) => !v)}
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="flex w-14 flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+            {isCollapsed ? 'Expand' : 'Collapse'}
+          </button>
+        </div>
       </div>
 
-      {/* Tab content */}
-      <div className="w-64 border-r border-border bg-card">
-        <ScrollArea className="h-full">
-          <div className="p-3">
-            {tab === 'slides' && (
-              <div className="space-y-2">
-                <h3 className="mb-2 text-sm font-semibold">Slides</h3>
-                {project.slides.map((slide, idx) => (
-                  <div
-                    key={slide.id}
-                    onClick={() => setCurrentSlide(slide.id)}
-                    className={`group relative cursor-pointer rounded-lg border-2 p-2 transition-all ${
-                      slide.id === currentSlideId ? 'border-primary' : 'border-transparent hover:border-border'
-                    }`}
-                  >
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="text-xs font-medium text-muted-foreground">{idx + 1}</span>
-                      <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); duplicateSlide(slide.id); }}
-                          className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                          title="Duplicate"
-                        >
-                          <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                        </button>
-                        {project.slides.length > 1 && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); deleteSlide(slide.id); }}
-                            className="rounded p-1 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
-                            title="Delete"
-                          >
-                            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                          </button>
-                        )}
-                      </div>
-                    </div>
+      {/* Content panel */}
+      {!isCollapsed && (
+        <div className="w-64 border-r border-border bg-card">
+          <ScrollArea className="h-full">
+            <div className="p-3">
+              {tab === 'slides' && (
+                <div className="space-y-2">
+                  <h3 className="mb-2 text-sm font-semibold">Slides</h3>
+                  {project.slides.map((slide, idx) => (
                     <div
-                      className="relative overflow-hidden rounded border border-border"
-                      style={{ aspectRatio: `${project.dimensions.width}/${project.dimensions.height}` }}
+                      key={slide.id}
+                      onClick={() => setCurrentSlide(slide.id)}
+                      className={`group relative cursor-pointer rounded-lg border-2 p-2 transition-all ${
+                        slide.id === currentSlideId ? 'border-primary' : 'border-transparent hover:border-border'
+                      }`}
                     >
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div
-                          className="scale-[0.04] rounded"
-                          style={{
-                            width: project.dimensions.width,
-                            height: project.dimensions.height,
-                            background: project.theme.background,
-                          }}
-                        >
-                          {slide.elements.filter(e => e.type === 'text').slice(0, 3).map((el, i) => (
-                            <div
-                              key={el.id}
-                              style={{
-                                position: 'absolute',
-                                left: (el as TextElement).x,
-                                top: (el as TextElement).y,
-                                width: (el as TextElement).width,
-                                fontSize: (el as TextElement).fontSize,
-                                color: (el as TextElement).fill,
-                                fontFamily: (el as TextElement).fontFamily,
-                                fontWeight: (el as TextElement).fontStyle.includes('bold') ? 'bold' : 'normal',
-                              }}
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">{idx + 1}</span>
+                        <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); duplicateSlide(slide.id); }}
+                            className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                            title="Duplicate"
+                          >
+                            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                          </button>
+                          {project.slides.length > 1 && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); deleteSlide(slide.id); }}
+                              className="rounded p-1 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
+                              title="Delete"
                             >
-                              {(el as TextElement).text.slice(0, 40)}
-                            </div>
-                          ))}
+                              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            </button>
+                          )}
                         </div>
                       </div>
+                      {/* Proper scaled thumbnail */}
+                      <div className="overflow-hidden rounded border border-border bg-muted/30">
+                        <SlideThumbnail
+                          slide={slide}
+                          width={project.dimensions.width}
+                          height={project.dimensions.height}
+                          theme={project.theme}
+                          maxWidth={224}
+                          maxHeight={140}
+                          className="w-full"
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => addSlide()}
-                >
-                  + Add Slide
-                </Button>
-              </div>
-            )}
-
-            {tab === 'text' && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold">Add Text</h3>
-                <Button variant="outline" className="w-full justify-start gap-2" onClick={() => addText('heading')}>
-                  <Type className="h-4 w-4" /> Add Heading
-                </Button>
-                <Button variant="outline" className="w-full justify-start gap-2" onClick={() => addText('subheading')}>
-                  <Type className="h-4 w-4" /> Add Subheading
-                </Button>
-                <Button variant="outline" className="w-full justify-start gap-2" onClick={() => addText('body')}>
-                  <Type className="h-4 w-4" /> Add Body Text
-                </Button>
-
-                <Separator className="my-3" />
-                <h4 className="text-xs font-medium text-muted-foreground">Font Styles</h4>
-                {FONT_OPTIONS.slice(0, 8).map((font) => (
-                  <button
-                    key={font}
-                    onClick={() => addText('body')}
-                    className="block w-full truncate rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
-                    style={{ fontFamily: font }}
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => addSlide()}
                   >
-                    {font}
-                  </button>
-                ))}
-              </div>
-            )}
+                    + Add Slide
+                  </Button>
+                </div>
+              )}
 
-            {tab === 'shapes' && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold">Shapes</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  {([
-                    { shape: 'rect', icon: Square, label: 'Rectangle' },
-                    { shape: 'ellipse', icon: Circle, label: 'Circle' },
-                    { shape: 'triangle', icon: TriangleIcon, label: 'Triangle' },
-                    { shape: 'star', icon: Star, label: 'Star' },
-                    { shape: 'line', icon: Minus, label: 'Line' },
-                  ] as const).map(({ shape, icon: Icon, label }) => (
+              {tab === 'text' && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">Add Text</h3>
+                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => addText('heading')}>
+                    <Type className="h-4 w-4" /> Add Heading
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => addText('subheading')}>
+                    <Type className="h-4 w-4" /> Add Subheading
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => addText('body')}>
+                    <Type className="h-4 w-4" /> Add Body Text
+                  </Button>
+
+                  <Separator className="my-3" />
+                  <h4 className="text-xs font-medium text-muted-foreground">Font Styles</h4>
+                  {FONT_OPTIONS.slice(0, 8).map((font) => (
                     <button
-                      key={shape}
-                      onClick={() => addShape(shape)}
-                      className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-border transition-colors hover:border-primary hover:bg-accent"
+                      key={font}
+                      onClick={() => addText('body')}
+                      className="block w-full truncate rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+                      style={{ fontFamily: font }}
                     >
-                      <Icon className="h-6 w-6 text-muted-foreground" />
-                      <span className="text-[10px] text-muted-foreground">{label}</span>
+                      {font}
                     </button>
                   ))}
                 </div>
+              )}
 
-                <Separator className="my-3" />
-                <h4 className="text-xs font-medium text-muted-foreground">Color Palette</h4>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {COLOR_PALETTE.slice(0, 15).map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => addShape({} as ShapeKind)}
-                      className="aspect-square rounded border border-border"
-                      style={{ background: color }}
-                    />
-                  ))}
+              {tab === 'shapes' && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">Shapes</h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      { shape: 'rect', icon: Square, label: 'Rectangle' },
+                      { shape: 'ellipse', icon: Circle, label: 'Circle' },
+                      { shape: 'triangle', icon: TriangleIcon, label: 'Triangle' },
+                      { shape: 'star', icon: Star, label: 'Star' },
+                      { shape: 'line', icon: Minus, label: 'Line' },
+                    ] as const).map(({ shape, icon: Icon, label }) => (
+                      <button
+                        key={shape}
+                        onClick={() => addShape(shape)}
+                        className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-border transition-colors hover:border-primary hover:bg-accent"
+                      >
+                        <Icon className="h-6 w-6 text-muted-foreground" />
+                        <span className="text-[10px] text-muted-foreground">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <Separator className="my-3" />
+                  <h4 className="text-xs font-medium text-muted-foreground">Color Palette</h4>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {COLOR_PALETTE.slice(0, 15).map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => addShape({} as ShapeKind)}
+                        className="aspect-square rounded border border-border"
+                        style={{ background: color }}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {tab === 'images' && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold">Images</h3>
-                <p className="text-xs text-muted-foreground">Paste an image URL to add it to the canvas.</p>
-                <ImageUrlInput onAdd={addImageByUrl} />
-              </div>
-            )}
+              {tab === 'images' && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">Images</h3>
+                  <p className="text-xs text-muted-foreground">Paste an image URL to add it to the canvas.</p>
+                  <ImageUrlInput onAdd={addImageByUrl} />
+                </div>
+              )}
 
-            {tab === 'uploads' && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold">Uploads</h3>
-                <FileUpload
-                  onUpload={(dataUrl) => addImageByUrl(dataUrl)}
-                />
-              </div>
-            )}
+              {tab === 'uploads' && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">Uploads</h3>
+                  <FileUpload
+                    onUpload={(dataUrl) => addImageByUrl(dataUrl)}
+                  />
+                </div>
+              )}
 
-            {tab === 'ai' && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold">AI Tools</h3>
-                <p className="text-xs text-muted-foreground">
-                  Select an element on the canvas, then use AI to rewrite text or change its style.
-                </p>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start gap-2"
-                  onClick={onOpenGenerator}
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3z"/></svg>
-                  Generate New Slideshow
-                </Button>
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-      </div>
+              {tab === 'ai' && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">AI Tools</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Select an element on the canvas, then use AI to rewrite text or change its style.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    onClick={onOpenGenerator}
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3z"/></svg>
+                    Generate New Slideshow
+                  </Button>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
     </div>
   );
 }
