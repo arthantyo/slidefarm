@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Slide, CanvasElement } from '@/types';
 import type { GuideLine } from '@/lib/canvas/snapping';
 import { useEditorStore } from '@/stores/editor-store';
+import { createImageElement } from '@/lib/canvas/element-factory';
 import { CanvasBoard } from '../canvas-board';
 import { CanvasToolbar } from './canvas-toolbar';
 import { CanvasSizePopover } from '../canvas-size/canvas-size-popover';
@@ -28,11 +29,12 @@ export function CanvasViewport({
   onDeselectAll,
 }: CanvasViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { zoom, setZoom, pan, setPan, activeTool, setActiveTool } = useEditorStore();
+  const { zoom, setZoom, pan, setPan, activeTool, setActiveTool, addElement } = useEditorStore();
   const [guides, setGuides] = useState<GuideLine[]>([]);
   const [showGrid, setShowGrid] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Auto fit-to-screen calculation
   const handleFitToScreen = useCallback(() => {
@@ -152,6 +154,58 @@ export function CanvasViewport({
     }
   };
 
+  // ── Drag & Drop image files onto canvas ──────────────────────────────────
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear when leaving the viewport container itself
+    if (!containerRef.current?.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragOver(false);
+
+      const file = Array.from(e.dataTransfer.files).find((f) =>
+        f.type.startsWith('image/')
+      );
+      if (!file || !containerRef.current) return;
+
+      const rect = containerRef.current.getBoundingClientRect();
+      // Convert screen drop position → canvas-space coordinates
+      const screenX = e.clientX - rect.left;
+      const screenY = e.clientY - rect.top;
+      const canvasX = (screenX - pan.x) / zoom;
+      const canvasY = (screenY - pan.y) / zoom;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const src = reader.result as string;
+        // Place image centered on drop point, default size 300×200
+        const imgW = 300;
+        const imgH = 200;
+        const el = createImageElement({
+          src,
+          x: canvasX - imgW / 2,
+          y: canvasY - imgH / 2,
+          width: imgW,
+          height: imgH,
+        });
+        addElement(el);
+      };
+      reader.readAsDataURL(file);
+    },
+    [pan, zoom, addElement]
+  );
+
   const cursorClass = isPanning
     ? 'cursor-grabbing'
     : isSpacePressed || activeTool === 'hand'
@@ -163,12 +217,24 @@ export function CanvasViewport({
       ref={containerRef}
       onWheel={handleWheel}
       onPointerDown={handlePointerDown}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       className={`relative h-full w-full select-none overflow-hidden bg-dot-grid ${cursorClass}`}
       style={{
         backgroundColor: 'var(--canvas-bg, rgba(0, 0, 0, 0.04))',
         touchAction: 'none',
       }}
     >
+      {/* Drag-over overlay */}
+      {isDragOver && (
+        <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded border-2 border-dashed border-primary bg-primary/10">
+          <span className="rounded-lg bg-background/80 px-4 py-2 text-sm font-medium text-primary shadow">
+            Drop image onto canvas
+          </span>
+        </div>
+      )}
+
       {/* Top Floating Bar: Canvas Size & Presets */}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40">
         <CanvasSizePopover />
