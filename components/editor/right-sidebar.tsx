@@ -53,6 +53,10 @@ export function RightSidebar() {
 
   const selectedId = selectedElementIds[0];
   const element = slide.elements.find((el) => el.id === selectedId);
+  const contentElements = slide.elements.filter((el) => el.type !== 'background');
+  const layerIndex = contentElements.findIndex((el) => el.id === selectedId);
+  const canMoveBackward = layerIndex > 0;
+  const canMoveForward = layerIndex >= 0 && layerIndex < contentElements.length - 1;
 
   // If no element selected, show Canvas settings
   if (!element) {
@@ -198,6 +202,7 @@ export function RightSidebar() {
                     variant="outline"
                     size="icon"
                     onClick={() => bringToFront(element.id)}
+                    disabled={!canMoveForward}
                     title="Bring to front"
                   >
                     <ChevronsUp className="h-4 w-4" />
@@ -206,6 +211,7 @@ export function RightSidebar() {
                     variant="outline"
                     size="icon"
                     onClick={() => bringForward(element.id)}
+                    disabled={!canMoveForward}
                     title="Bring forward"
                   >
                     <ArrowUp className="h-4 w-4" />
@@ -214,6 +220,7 @@ export function RightSidebar() {
                     variant="outline"
                     size="icon"
                     onClick={() => sendBackward(element.id)}
+                    disabled={!canMoveBackward}
                     title="Send backward"
                   >
                     <ArrowDown className="h-4 w-4" />
@@ -222,6 +229,7 @@ export function RightSidebar() {
                     variant="outline"
                     size="icon"
                     onClick={() => sendToBack(element.id)}
+                    disabled={!canMoveBackward}
                     title="Send to back"
                   >
                     <ChevronsDown className="h-4 w-4" />

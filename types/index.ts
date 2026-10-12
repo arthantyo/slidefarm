@@ -32,10 +32,14 @@ export interface BaseElement {
 
 export interface TextElement extends BaseElement {
   type: 'text';
+  /** Template placeholder key — if set, JSON fill will replace `text` with data[placeholder] */
+  placeholder?: string;
   text: string;
   fontSize: number;
   fontFamily: string;
   fontStyle: FontStyle;
+  /** Numeric weight; older slides use fontStyle's normal/bold value. */
+  fontWeight?: number;
   textDecoration: 'none' | 'underline' | 'line-through';
   fill: string;
   align: TextAlign;
@@ -57,6 +61,8 @@ export interface TextElement extends BaseElement {
 
 export interface ImageElement extends BaseElement {
   type: 'image';
+  /** Template placeholder key — marks this as an image slot the user fills manually */
+  placeholder?: string;
   src: string;
   imagePrompt?: string;
   objectFit: 'cover' | 'contain' | 'fill';
@@ -165,6 +171,7 @@ export interface ProjectDimensions {
 export interface Project {
   id: string;
   name: string;
+  folderId?: string | null;
   dimensions: ProjectDimensions;
   slides: Slide[];
   theme: Theme;
@@ -172,6 +179,12 @@ export interface Project {
   createdAt: number;
   updatedAt: number;
   thumbnail?: string | null;
+}
+
+export interface ProjectFolder {
+  id: string;
+  name: string;
+  createdAt: number;
 }
 
 // ─── Templates ───────────────────────────────────────────────────────────────
@@ -185,6 +198,17 @@ export interface Template {
   theme: Theme;
   slides: Slide[];
   thumbnail?: string | null;
+}
+
+/**
+ * A template created by the user from an existing project.
+ * Placeholder keys are text element `placeholder` fields found in the slides.
+ */
+export interface CustomTemplate extends Template {
+  isCustom: true;
+  /** All placeholder keys extracted from slides — used to build the fill-form */
+  placeholderKeys: string[];
+  createdAt: number;
 }
 
 // ─── Platform Presets ────────────────────────────────────────────────────────

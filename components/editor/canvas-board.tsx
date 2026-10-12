@@ -3,11 +3,13 @@
 import React, { useState, useRef, useCallback } from 'react';
 import type { Slide, CanvasElement, BackgroundElement } from '@/types';
 import type { GuideLine } from '@/lib/canvas/snapping';
+import { calculateSnapping } from '@/lib/canvas/snapping';
 import { BackgroundRenderer } from './elements/background-renderer';
 import { ElementWrapper } from './elements/element-wrapper';
 import { ElementTransformer } from './transformer/element-transformer';
 import { GuideLinesOverlay } from './guides/guide-lines-overlay';
 import { CanvasResizeHandles } from './canvas-size/canvas-resize-handles';
+import { DragIndicatorHUD } from './indicators/drag-indicator-hud';
 
 interface CanvasBoardProps {
   slide: Slide;
@@ -46,6 +48,12 @@ export function CanvasBoard({
 }: CanvasBoardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
+  const [multiDragIndicator, setMultiDragIndicator] = useState<{
+    x: number;
+    y: number;
+    snapLabelX?: string;
+    snapLabelY?: string;
+  } | null>(null);
 
   const background = slide.elements.find((el) => el.type === 'background') as
     | BackgroundElement
@@ -108,7 +116,7 @@ export function CanvasBoard({
               import('@/stores/editor-store').then(({ useEditorStore }) => {
                 useEditorStore.getState().selectMultiple(
                   upEvt.shiftKey || upEvt.metaKey
-                    ? [...new Set([...useEditorStore.getState().selectedElementIds, ...hit])]
+                    ? Array.from(new Set([...useEditorStore.getState().selectedElementIds, ...hit]))
                     : hit
                 );
               });
@@ -150,14 +158,36 @@ export function CanvasBoard({
 
     const startPointerX = e.clientX;
     const startPointerY = e.clientY;
+    if (!multiBBox) return;
+    const startBox = multiBBox;
+    const otherElements = slide.elements.filter((el) => !selectedElementIds.includes(el.id));
     // snapshot start positions
     const startPositions = selectedElements.map((el) => ({ id: el.id, x: el.x, y: el.y }));
 
     const onPointerMove = (moveEvt: PointerEvent) => {
-      const dx = (moveEvt.clientX - startPointerX) / zoom;
-      const dy = (moveEvt.clientY - startPointerY) / zoom;
+      const rawX = startBox.x + (moveEvt.clientX - startPointerX) / zoom;
+      const rawY = startBox.y + (moveEvt.clientY - startPointerY) / zoom;
+      const snap = calculateSnapping({
+        draggedId: selectedElements[0].id,
+        x: rawX,
+        y: rawY,
+        width: startBox.right - startBox.x,
+        height: startBox.bottom - startBox.y,
+        canvasWidth: width,
+        canvasHeight: height,
+        allElements: otherElements,
+      });
+      const dx = snap.x - startBox.x;
+      const dy = snap.y - startBox.y;
       startPositions.forEach(({ id, x, y }) => {
         onUpdateElement(id, { x: x + dx, y: y + dy });
+      });
+      setGuides(snap.guides);
+      setMultiDragIndicator({
+        x: snap.x + (startBox.right - startBox.x) / 2,
+        y: snap.y,
+        snapLabelX: snap.snapLabelX,
+        snapLabelY: snap.snapLabelY,
       });
     };
 
@@ -165,6 +195,7 @@ export function CanvasBoard({
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       setGuides([]);
+      setMultiDragIndicator(null);
     };
 
     window.addEventListener('pointermove', onPointerMove);
@@ -256,6 +287,9 @@ export function CanvasBoard({
             boxShadow: '0 0 0 1px rgba(255,255,255,0.4)',
           }}
         >
+          <div className="pointer-events-none absolute -top-7 left-0 rounded bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground shadow">
+            {selectedElements.length} selected
+          </div>
           {/* Individual selected-element outlines inside the bbox */}
           {selectedElements.map((el) => (
             <div
@@ -272,6 +306,17 @@ export function CanvasBoard({
             />
           ))}
         </div>
+      )}
+
+      {multiBBox && multiDragIndicator && (
+        <DragIndicatorHUD
+          x={multiDragIndicator.x}
+          y={multiDragIndicator.y}
+          zoom={zoom}
+          mode="drag"
+          snapLabelX={multiDragIndicator.snapLabelX}
+          snapLabelY={multiDragIndicator.snapLabelY}
+        />
       )}
 
       {/* Rubber-band selection marquee */}

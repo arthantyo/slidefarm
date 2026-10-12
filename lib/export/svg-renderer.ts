@@ -1,6 +1,8 @@
 import type { Slide, CanvasElement, BackgroundElement, TextElement, ShapeElement, ImageElement } from '@/types';
 import { getWrappedLines } from './text-wrap';
 import { renderSlideToCanvas } from './canvas-renderer';
+import { getTextFontWeight, isTextItalic } from '@/lib/canvas/text-style';
+import { elementsInLayerOrder } from '@/lib/canvas/layers';
 
 function renderElementToSVG(el: CanvasElement, width: number, height: number): string {
   if (!el.visible) return '';
@@ -22,12 +24,8 @@ function renderElementToSVG(el: CanvasElement, width: number, height: number): s
 
   if (el.type === 'text') {
     const t = el as TextElement;
-    const fontStyle = t.fontStyle === 'bold-italic' ? 'bold italic'
-      : t.fontStyle === 'bold' ? 'bold'
-      : t.fontStyle === 'italic' ? 'italic'
-      : 'normal';
-    const fontWeight = fontStyle.includes('bold') ? 'bold' : 'normal';
-    const fontStyleAttr = fontStyle.includes('italic') ? 'italic' : 'normal';
+    const fontWeight = getTextFontWeight(t);
+    const fontStyleAttr = isTextItalic(t) ? 'italic' : 'normal';
 
     const padding = t.padding || 0;
     const maxWidth = Math.max(10, t.width - padding * 2);
@@ -37,7 +35,7 @@ function renderElementToSVG(el: CanvasElement, width: number, height: number): s
       maxWidth,
       t.fontFamily,
       t.fontSize,
-      fontWeight,
+      String(fontWeight),
       fontStyleAttr,
       t.letterSpacing
     );
@@ -114,7 +112,7 @@ function escapeXML(str: string): string {
 }
 
 export function slideToSVG(slide: Slide, width: number, height: number): string {
-  const elements = slide.elements.map((el) => renderElementToSVG(el, width, height)).join('');
+  const elements = elementsInLayerOrder(slide.elements).map((el) => renderElementToSVG(el, width, height)).join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${elements}</svg>`;
 }
 

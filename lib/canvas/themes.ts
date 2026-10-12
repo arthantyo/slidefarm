@@ -87,6 +87,7 @@ export const DEFAULT_THEME: Theme = DEFAULT_THEMES['modern-editorial'];
 
 export const FONT_OPTIONS = [
   'Inter',
+  'Instrument Sans',
   'Playfair Display',
   'Poppins',
   'Roboto',

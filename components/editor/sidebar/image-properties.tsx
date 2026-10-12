@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import React from 'react';
-import type { ImageElement } from '@/types';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
+import React from "react";
+import type { ImageElement } from "@/types";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 
 interface ImagePropertiesProps {
   element: ImageElement;
@@ -26,7 +26,9 @@ export function ImageProperties({ element, onUpdate }: ImagePropertiesProps) {
         <Label className="text-xs">Fit</Label>
         <Select
           value={element.objectFit}
-          onValueChange={(v) => onUpdate({ objectFit: v as ImageElement['objectFit'] })}
+          onValueChange={(v) =>
+            onUpdate({ objectFit: v as ImageElement["objectFit"] })
+          }
         >
           <SelectTrigger className="h-8 text-xs">
             <SelectValue />
@@ -59,6 +61,21 @@ export function ImageProperties({ element, onUpdate }: ImagePropertiesProps) {
           onChange={(e) => onUpdate({ src: e.target.value })}
           className="h-8 text-xs font-mono"
         />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs">Manual image placeholder key</Label>
+        <Input
+          value={element.placeholder ?? ""}
+          onChange={(e) =>
+            onUpdate({ placeholder: e.target.value || undefined })
+          }
+          placeholder="hero_image"
+          className="h-8 text-xs"
+        />
+        <p className="text-[11px] text-muted-foreground">
+          Image sources are not changed by JSON fill.
+        </p>
       </div>
     </div>
   );

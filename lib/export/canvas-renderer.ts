@@ -8,6 +8,7 @@ import type {
 } from "@/types";
 import { getWrappedLines } from "./text-wrap";
 import { loadFont } from "../font-loader";
+import { getTextFontWeight, isTextItalic } from "../canvas/text-style";
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -59,14 +60,10 @@ export async function renderSlideToCanvas(
     otherElements
       .filter((el): el is TextElement => el.type === "text")
       .map((el) => {
-        const isBold =
-          el.fontStyle === "bold" || el.fontStyle === "bold-italic";
-        const isItalic =
-          el.fontStyle === "italic" || el.fontStyle === "bold-italic";
         return loadFont(
           el.fontFamily,
-          isBold ? "bold" : "normal",
-          isItalic ? "italic" : "normal",
+          getTextFontWeight(el),
+          isTextItalic(el) ? "italic" : "normal",
         ).catch(() => undefined);
       }),
   );
@@ -113,10 +110,8 @@ export async function renderSlideToCanvas(
 }
 
 function renderTextElement(ctx: CanvasRenderingContext2D, el: TextElement) {
-  const isBold = el.fontStyle === "bold" || el.fontStyle === "bold-italic";
-  const isItalic = el.fontStyle === "italic" || el.fontStyle === "bold-italic";
-  const fontWeight = isBold ? "bold" : "normal";
-  const fontStyle = isItalic ? "italic" : "normal";
+  const fontWeight = getTextFontWeight(el);
+  const fontStyle = isTextItalic(el) ? "italic" : "normal";
 
   ctx.font = `${fontStyle} ${fontWeight} ${el.fontSize}px "${el.fontFamily}", sans-serif`;
   ctx.fillStyle = el.fill;
@@ -137,7 +132,7 @@ function renderTextElement(ctx: CanvasRenderingContext2D, el: TextElement) {
     maxWidth,
     el.fontFamily,
     el.fontSize,
-    fontWeight,
+    String(fontWeight),
     fontStyle,
     el.letterSpacing,
   );
@@ -157,8 +152,7 @@ function renderTextElement(ctx: CanvasRenderingContext2D, el: TextElement) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const lineMetrics = ctx.measureText(line);
-    const lineW = lineMetrics.width;
+    const lineW = ctx.measureText(line).width + Math.max(0, line.length - 1) * el.letterSpacing;
 
     let lineX = el.x + padding;
     if (el.align === "center") {
@@ -168,7 +162,15 @@ function renderTextElement(ctx: CanvasRenderingContext2D, el: TextElement) {
     }
 
     const lineY = startY + i * lineHeightPx;
-    ctx.fillText(line, lineX, lineY);
+    if (el.letterSpacing === 0) {
+      ctx.fillText(line, lineX, lineY);
+    } else {
+      let characterX = lineX;
+      for (const character of line) {
+        ctx.fillText(character, characterX, lineY);
+        characterX += ctx.measureText(character).width + el.letterSpacing;
+      }
+    }
 
     if (el.textDecoration === "underline") {
       ctx.fillRect(

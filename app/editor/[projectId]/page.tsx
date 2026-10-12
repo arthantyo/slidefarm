@@ -22,6 +22,10 @@ export default function EditorPage() {
   const [generatorOpen, setGeneratorOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestProjectRef = useRef(project);
+  const latestDirtyRef = useRef(useEditorStore.getState().isDirty);
+  latestProjectRef.current = project;
+  latestDirtyRef.current = useEditorStore.getState().isDirty;
 
   // Load project from store
   useEffect(() => {
@@ -40,13 +44,41 @@ export default function EditorPage() {
   useEffect(() => {
     if (!project || !project.id) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      useProjectStore.getState().save(project);
+    saveTimerRef.current = setTimeout(async () => {
+      const saved = await useProjectStore.getState().save(project);
+      if (saved && latestProjectRef.current === project) {
+        useEditorStore.getState().markClean();
+      }
     }, 2000);
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
   }, [project]);
+
+  // A pending autosave must survive navigation and page closure.
+  useEffect(() => {
+    const flush = () => {
+      if (!latestDirtyRef.current || !latestProjectRef.current) return;
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+      const pendingProject = latestProjectRef.current;
+      void useProjectStore.getState().save(pendingProject).then((saved) => {
+        if (saved && useEditorStore.getState().project === pendingProject) {
+          useEditorStore.getState().markClean();
+        }
+      });
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      flush();
+    };
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -102,8 +134,11 @@ export default function EditorPage() {
       // Save
       if (cmd && e.key === 's') {
         e.preventDefault();
-        if (project) useProjectStore.getState().save(project);
-        useEditorStore.getState().markClean();
+        if (project) void useProjectStore.getState().save(project).then((saved) => {
+          if (saved && useEditorStore.getState().project === project) {
+            useEditorStore.getState().markClean();
+          }
+        });
         return;
       }
       // Escape — deselect

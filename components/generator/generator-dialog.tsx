@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -24,14 +24,15 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Sparkles, ChevronDown, Loader2, Wand2 } from 'lucide-react';
 import { PLATFORM_PRESETS } from '@/types';
-import type { GenerationOptions, AspectRatioKey, Tone, ContentDensity, VisualStyle } from '@/types';
+import type { GenerationOptions, AspectRatioKey, Tone, ContentDensity, VisualStyle, Project, TextElement } from '@/types';
 import { useEditorStore } from '@/stores/editor-store';
 import { useProjectStore } from '@/stores/project-store';
-import { assembleProject } from '@/lib/ai/assembly';
+import { assembleProject, assembleRemixedProject } from '@/lib/ai/assembly';
 
 interface GeneratorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  remixProject?: Project | null;
 }
 
 const TONE_OPTIONS: { value: Tone; label: string }[] = [
@@ -60,7 +61,7 @@ const STYLE_OPTIONS: { value: VisualStyle; label: string }[] = [
   { value: 'abstract', label: 'Abstract' },
 ];
 
-export function GeneratorDialog({ open, onOpenChange }: GeneratorDialogProps) {
+export function GeneratorDialog({ open, onOpenChange, remixProject }: GeneratorDialogProps) {
   const router = useRouter();
   const loadProject = useEditorStore((s) => s.loadProject);
   const setGenerating = useEditorStore((s) => s.setGenerating);
@@ -79,6 +80,14 @@ export function GeneratorDialog({ open, onOpenChange }: GeneratorDialogProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!open) return;
+    setPrompt(remixProject ? `Remix ${remixProject.name}` : '');
+    setAutoSlideCount(!remixProject);
+    setSlideCount(remixProject?.slides.length ?? 6);
+    setError(null);
+  }, [open, remixProject]);
+
   const handleGenerate = async () => {
     if (prompt.trim().length < 3) {
       setError('Please enter a longer prompt');
@@ -92,6 +101,13 @@ export function GeneratorDialog({ open, onOpenChange }: GeneratorDialogProps) {
 
     try {
       const preset = PLATFORM_PRESETS.find((p) => p.key === platform) ?? PLATFORM_PRESETS[3];
+      const sourceText = remixProject?.slides.flatMap((slide, index) => [
+        `Slide ${index + 1} (${slide.type}): ${slide.elements
+          .filter((element): element is TextElement => element.type === 'text')
+          .map((element) => `${element.name}: ${element.text}`)
+          .filter(Boolean)
+          .join(' | ')}`,
+      ]).join('\n').slice(0, 8000);
       const options: GenerationOptions = {
         prompt: prompt.trim(),
         slideCount: autoSlideCount ? 'auto' : slideCount,
@@ -101,7 +117,10 @@ export function GeneratorDialog({ open, onOpenChange }: GeneratorDialogProps) {
         contentDensity: density,
         language,
         visualStyle,
-        customInstructions: customInstructions.trim() || undefined,
+        customInstructions: [
+          remixProject && `Use this existing slideshow as the source material. Keep exactly ${remixProject.slides.length} slides in the same order and rewrite their copy to fit the user's remix request. The original layout, images, colors, and typography will be preserved. Keep each headline and body similar in length to the source so it fits its existing text box. For slides with Item 1, Item 2, etc., provide a matching listItems array with the same number of items:\n${sourceText}`,
+          customInstructions.trim(),
+        ].filter(Boolean).join('\n\n') || undefined,
       };
 
       setGenerationProgress({ stage: 'Generating slide content', current: 2, total: 6 });
@@ -125,11 +144,15 @@ export function GeneratorDialog({ open, onOpenChange }: GeneratorDialogProps) {
 
       setGenerationProgress({ stage: 'Assembling slides', current: 4, total: 6 });
 
-      const project = assembleProject(plan, preset.width, preset.height);
+      const project = remixProject
+        ? assembleRemixedProject(plan, remixProject)
+        : assembleProject(plan, preset.width, preset.height);
 
       setGenerationProgress({ stage: 'Preparing editor', current: 5, total: 6 });
 
-      useProjectStore.getState().save(project);
+      if (!await useProjectStore.getState().save(project)) {
+        throw new Error('Could not save the generated project locally');
+      }
       loadProject(project);
 
       setGenerationProgress({ stage: 'Done', current: 6, total: 6 });
@@ -152,17 +175,19 @@ export function GeneratorDialog({ open, onOpenChange }: GeneratorDialogProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Sparkles className="h-5 w-5 text-primary" />
-            Generate Slideshow with AI
+            {remixProject ? `Remix ${remixProject.name} with AI` : 'Generate Slideshow with AI'}
           </DialogTitle>
           <DialogDescription>
-            Enter a topic and let AI create a complete slideshow for you. Everything is editable afterward.
+            {remixProject
+              ? 'Describe what to change. A new slideshow will be created from this project.'
+              : 'Enter a topic and let AI create a complete slideshow for you. Everything is editable afterward.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
           {/* Prompt */}
           <div className="space-y-2">
-            <Label htmlFor="prompt">What is your slideshow about?</Label>
+            <Label htmlFor="prompt">{remixProject ? 'How should this slideshow change?' : 'What is your slideshow about?'}</Label>
             <Textarea
               id="prompt"
               placeholder="e.g. 7 benefits of learning Python, 5 tips for saving money, how to start a morning routine..."

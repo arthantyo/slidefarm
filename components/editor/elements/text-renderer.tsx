@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import type { TextElement } from "@/types";
 import { loadFont } from "@/lib/font-loader";
+import { getTextFontWeight, isTextItalic } from "@/lib/canvas/text-style";
 
 interface TextRendererProps {
   element: TextElement;
@@ -18,22 +19,19 @@ export function TextRenderer({
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(element.text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { fontFamily, fontStyle, fontWeight } = element;
 
   useEffect(() => {
     setEditText(element.text);
   }, [element.text]);
 
   useEffect(() => {
-    const isBold =
-      element.fontStyle === "bold" || element.fontStyle === "bold-italic";
-    const isItalic =
-      element.fontStyle === "italic" || element.fontStyle === "bold-italic";
     void loadFont(
-      element.fontFamily,
-      isBold ? "bold" : "normal",
-      isItalic ? "italic" : "normal",
+      fontFamily,
+      fontWeight ?? (fontStyle === "bold" || fontStyle === "bold-italic" ? 700 : 400),
+      fontStyle === "italic" || fontStyle === "bold-italic" ? "italic" : "normal",
     ).catch(() => undefined);
-  }, [element.fontFamily, element.fontStyle]);
+  }, [fontFamily, fontStyle, fontWeight]);
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -49,11 +47,6 @@ export function TextRenderer({
     }
   };
 
-  const isBold =
-    element.fontStyle === "bold" || element.fontStyle === "bold-italic";
-  const isItalic =
-    element.fontStyle === "italic" || element.fontStyle === "bold-italic";
-
   const shadowCss = element.shadow
     ? `${element.shadow.offsetX}px ${element.shadow.offsetY}px ${element.shadow.blur}px ${element.shadow.color}`
     : undefined;
@@ -62,8 +55,8 @@ export function TextRenderer({
     color: element.fill,
     fontSize: `${element.fontSize}px`,
     fontFamily: element.fontFamily,
-    fontWeight: isBold ? "bold" : "normal",
-    fontStyle: isItalic ? "italic" : "normal",
+    fontWeight: getTextFontWeight(element),
+    fontStyle: isTextItalic(element) ? "italic" : "normal",
     textDecoration: element.textDecoration,
     textAlign: element.align,
     lineHeight: element.lineHeight,

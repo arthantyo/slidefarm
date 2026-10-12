@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
+import { moveElementLayer, type LayerMove } from '@/lib/canvas/layers';
 import type {
   Project, Slide, CanvasElement, Theme, TextElement, ImageElement,
   ShapeElement, BackgroundElement, ProjectDimensions,
@@ -89,6 +90,16 @@ function cloneSlides(slides: Slide[]): Slide[] {
 
 function cloneTheme(theme: Theme): Theme {
   return JSON.parse(JSON.stringify(theme));
+}
+
+function reorderLayer(get: () => EditorState, elementId: string, move: LayerMove) {
+  const { project, currentSlideId } = get();
+  const slide = project?.slides.find((item) => item.id === currentSlideId);
+  if (!slide) return;
+  const elements = moveElementLayer(slide.elements, elementId, move);
+  if (elements === slide.elements) return;
+  get().pushHistory();
+  get().updateSlide(slide.id, (current) => ({ ...current, elements }));
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -225,7 +236,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   reorderSlides: (fromIndex, toIndex) => {
     const { project } = get();
-    if (!project) return;
+    if (!project || fromIndex === toIndex || fromIndex < 0 || toIndex < 0 ||
+        fromIndex >= project.slides.length || toIndex >= project.slides.length) return;
+    get().pushHistory();
     const newSlides = [...project.slides];
     const [moved] = newSlides.splice(fromIndex, 1);
     newSlides.splice(toIndex, 0, moved);
@@ -341,59 +354,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
 
-  bringForward: (elementId) => {
-    const { currentSlideId } = get();
-    if (!currentSlideId) return;
-    get().pushHistory();
-    get().updateSlide(currentSlideId, (slide) => {
-      const idx = slide.elements.findIndex((el) => el.id === elementId);
-      if (idx < 0 || idx >= slide.elements.length - 1) return slide;
-      const newElements = [...slide.elements];
-      [newElements[idx], newElements[idx + 1]] = [newElements[idx + 1], newElements[idx]];
-      return { ...slide, elements: newElements };
-    });
-  },
-
-  sendBackward: (elementId) => {
-    const { currentSlideId } = get();
-    if (!currentSlideId) return;
-    get().pushHistory();
-    get().updateSlide(currentSlideId, (slide) => {
-      const idx = slide.elements.findIndex((el) => el.id === elementId);
-      if (idx <= 0) return slide;
-      const newElements = [...slide.elements];
-      [newElements[idx], newElements[idx - 1]] = [newElements[idx - 1], newElements[idx]];
-      return { ...slide, elements: newElements };
-    });
-  },
-
-  bringToFront: (elementId) => {
-    const { currentSlideId } = get();
-    if (!currentSlideId) return;
-    get().pushHistory();
-    get().updateSlide(currentSlideId, (slide) => {
-      const idx = slide.elements.findIndex((el) => el.id === elementId);
-      if (idx < 0) return slide;
-      const newElements = [...slide.elements];
-      const [el] = newElements.splice(idx, 1);
-      newElements.push(el);
-      return { ...slide, elements: newElements };
-    });
-  },
-
-  sendToBack: (elementId) => {
-    const { currentSlideId } = get();
-    if (!currentSlideId) return;
-    get().pushHistory();
-    get().updateSlide(currentSlideId, (slide) => {
-      const idx = slide.elements.findIndex((el) => el.id === elementId);
-      if (idx < 0) return slide;
-      const newElements = [...slide.elements];
-      const [el] = newElements.splice(idx, 1);
-      newElements.unshift(el);
-      return { ...slide, elements: newElements };
-    });
-  },
+  bringForward: (elementId) => reorderLayer(get, elementId, 'forward'),
+  sendBackward: (elementId) => reorderLayer(get, elementId, 'backward'),
+  bringToFront: (elementId) => reorderLayer(get, elementId, 'front'),
+  sendToBack: (elementId) => reorderLayer(get, elementId, 'back'),
 
   // ─── Clipboard ─────────────────────────────────────────────────────────────
 

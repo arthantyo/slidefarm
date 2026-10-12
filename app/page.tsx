@@ -1,34 +1,137 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useProjectStore } from '@/stores/project-store';
-import { useEditorStore } from '@/stores/editor-store';
-import { createBlankProject, STARTER_TEMPLATES } from '@/lib/canvas/templates';
-import { DashboardHeader } from '@/components/dashboard/header';
-import { ProjectCard } from '@/components/dashboard/project-card';
-import { TemplateGallery } from '@/components/dashboard/template-gallery';
-import { GeneratorDialog } from '@/components/generator/generator-dialog';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Sparkles, Plus, LayoutGrid, Clock } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useTheme } from '@/components/theme-provider';
-import { Moon, Sun } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { Project, ProjectFolder } from "@/types";
+import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore } from "@/stores/editor-store";
+import { useCustomTemplateStore } from "@/stores/custom-template-store";
+import { createBlankProject, STARTER_TEMPLATES } from "@/lib/canvas/templates";
+import { fillTemplateFromData } from "@/lib/canvas/template-filler";
+import { DashboardHeader } from "@/components/dashboard/header";
+import { ProjectCard } from "@/components/dashboard/project-card";
+import { TemplateGallery } from "@/components/dashboard/template-gallery";
+import { GeneratorDialog } from "@/components/generator/generator-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import {
+  Sparkles,
+  Plus,
+  LayoutGrid,
+  Clock,
+  FolderPlus,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useTheme } from "@/components/theme-provider";
+import { Moon, Sun } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { projects, load, delete: deleteProject, duplicate } = useProjectStore();
+  const {
+    projects,
+    loaded,
+    load,
+    delete: deleteProject,
+    duplicate,
+    storageError,
+    rename: renameProject,
+    folders,
+    createFolder,
+    renameFolder,
+    deleteFolder,
+    moveToFolder,
+  } = useProjectStore();
   const loadProject = useEditorStore((s) => s.loadProject);
+  const customTemplates = useCustomTemplateStore((s) => s.templates);
+  const loadCustomTemplates = useCustomTemplateStore((s) => s.load);
   const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [remixProject, setRemixProject] = useState<Project | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [selectedFolderId, setSelectedFolderId] = useState("all");
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false);
+  const [folderName, setFolderName] = useState("");
+  const [folderIdToEdit, setFolderIdToEdit] = useState<string | null>(null);
+  const [folderError, setFolderError] = useState("");
+  const [folderToDelete, setFolderToDelete] = useState<ProjectFolder | null>(
+    null,
+  );
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const sortedProjects = [...projects].sort((a, b) => b.updatedAt - a.updatedAt);
+  useEffect(() => {
+    loadCustomTemplates();
+  }, [loadCustomTemplates]);
+
+  const sortedProjects = [...projects].sort(
+    (a, b) => b.updatedAt - a.updatedAt,
+  );
+  const visibleProjects = sortedProjects.filter((project) => {
+    if (selectedFolderId === "all") return true;
+    if (selectedFolderId === "unfiled") return !project.folderId;
+    return project.folderId === selectedFolderId;
+  });
+  const selectedFolder = folders.find(
+    (folder) => folder.id === selectedFolderId,
+  );
+
+  const openFolderDialog = (folder?: ProjectFolder) => {
+    setFolderIdToEdit(folder?.id ?? null);
+    setFolderName(folder?.name ?? "");
+    setFolderError("");
+    setFolderDialogOpen(true);
+  };
+
+  const handleSaveFolder = () => {
+    const trimmedName = folderName.trim();
+    if (!trimmedName) return;
+    const duplicateName = folders.some(
+      (folder) =>
+        folder.id !== folderIdToEdit &&
+        folder.name.toLowerCase() === trimmedName.toLowerCase(),
+    );
+    if (duplicateName) {
+      setFolderError("A folder with this name already exists.");
+      return;
+    }
+    if (folderIdToEdit) {
+      renameFolder(folderIdToEdit, trimmedName);
+    } else {
+      const folder = createFolder(trimmedName);
+      if (folder) setSelectedFolderId(folder.id);
+    }
+    setFolderDialogOpen(false);
+  };
 
   const handleOpenProject = (projectId: string) => {
     const project = projects.find((p) => p.id === projectId);
@@ -38,9 +141,9 @@ export default function DashboardPage() {
     }
   };
 
-  const handleCreateBlank = () => {
-    const project = createBlankProject('Untitled Project');
-    useProjectStore.getState().save(project);
+  const handleCreateBlank = async () => {
+    const project = createBlankProject("Untitled Project");
+    if (!(await useProjectStore.getState().save(project))) return;
     loadProject(project);
     router.push(`/editor/${project.id}`);
   };
@@ -56,20 +159,29 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader
-        onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        isDark={theme === 'dark'}
+        onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
+        isDark={theme === "dark"}
       />
 
       <main className="mx-auto max-w-7xl px-6 py-8">
+        {storageError && (
+          <div
+            className="mb-6 rounded-md border border-destructive p-3 text-sm text-destructive"
+            role="alert"
+          >
+            {storageError}
+          </div>
+        )}
         {/* Hero section */}
         <div className="mb-10 rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-8 border border-border">
           <div className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
             <div className="space-y-3">
               <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
-                Create stunning slideshows with AI
+                Create Tiktok slideshows with AI
               </h1>
               <p className="text-muted-foreground text-lg max-w-xl">
-                Generate complete slideshows from a single prompt, then customize every detail in the visual editor.
+                Generate complete slideshows from a single prompt, then
+                customize every detail in the visual editor.
               </p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -97,10 +209,22 @@ export default function DashboardPage() {
         {/* Quick actions */}
         <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
           {[
-            { label: 'Generate with AI', icon: Sparkles, action: () => setGeneratorOpen(true) },
-            { label: 'Blank Project', icon: Plus, action: handleCreateBlank },
-            { label: 'Browse Templates', icon: LayoutGrid, action: () => setTemplatesOpen(true) },
-            { label: 'Toggle Theme', icon: theme === 'dark' ? Sun : Moon, action: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
+            {
+              label: "Generate with AI",
+              icon: Sparkles,
+              action: () => setGeneratorOpen(true),
+            },
+            { label: "Blank Project", icon: Plus, action: handleCreateBlank },
+            {
+              label: "Browse Templates",
+              icon: LayoutGrid,
+              action: () => setTemplatesOpen(true),
+            },
+            {
+              label: "Toggle Theme",
+              icon: theme === "dark" ? Sun : Moon,
+              action: () => setTheme(theme === "dark" ? "light" : "dark"),
+            },
           ].map(({ label, icon: Icon, action }) => (
             <Card
               key={label}
@@ -130,7 +254,60 @@ export default function DashboardPage() {
           </TabsList>
 
           <TabsContent value="projects">
-            {sortedProjects.length === 0 ? (
+            <div className="mb-5 flex flex-wrap items-center gap-2">
+              <Select
+                value={selectedFolderId}
+                onValueChange={setSelectedFolderId}
+              >
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="All projects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All projects</SelectItem>
+                  <SelectItem value="unfiled">Unfiled</SelectItem>
+                  {folders.map((folder) => (
+                    <SelectItem key={folder.id} value={folder.id}>
+                      {folder.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openFolderDialog()}
+                className="gap-1.5"
+              >
+                <FolderPlus className="h-4 w-4" /> New folder
+              </Button>
+              {selectedFolder && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Rename folder"
+                    aria-label={`Rename ${selectedFolder.name}`}
+                    onClick={() => openFolderDialog(selectedFolder)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Delete folder"
+                    aria-label={`Delete ${selectedFolder.name}`}
+                    onClick={() => setFolderToDelete(selectedFolder)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+            {!loaded ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                Loading projects...
+              </div>
+            ) : sortedProjects.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-20 text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                   <Sparkles className="h-8 w-8 text-muted-foreground" />
@@ -138,23 +315,40 @@ export default function DashboardPage() {
                 <div>
                   <h3 className="text-lg font-semibold">No projects yet</h3>
                   <p className="text-muted-foreground mt-1">
-                    Generate your first slideshow with AI or start from a template.
+                    Generate your first slideshow with AI or start from a
+                    template.
                   </p>
                 </div>
-                <Button onClick={() => setGeneratorOpen(true)} className="gap-2 mt-2">
+                <Button
+                  onClick={() => setGeneratorOpen(true)}
+                  className="gap-2 mt-2"
+                >
                   <Sparkles className="h-4 w-4" />
                   Generate with AI
                 </Button>
               </div>
+            ) : visibleProjects.length === 0 ? (
+              <div className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">
+                No projects in this folder yet.
+              </div>
             ) : (
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {sortedProjects.map((project) => (
+                {visibleProjects.map((project) => (
                   <ProjectCard
                     key={project.id}
                     project={project}
                     onOpen={() => handleOpenProject(project.id)}
                     onDelete={() => handleDelete(project.id)}
                     onDuplicate={() => handleDuplicate(project.id)}
+                    onRemix={() => {
+                      setRemixProject(project);
+                      setGeneratorOpen(true);
+                    }}
+                    onRename={(name) => renameProject(project.id, name)}
+                    folders={folders}
+                    onMoveToFolder={(folderId) =>
+                      moveToFolder(project.id, folderId)
+                    }
                   />
                 ))}
               </div>
@@ -163,7 +357,8 @@ export default function DashboardPage() {
 
           <TabsContent value="templates">
             <TemplateGallery
-              onUseTemplate={(template) => {
+              customTemplates={customTemplates}
+              onUseTemplate={async (template) => {
                 const project = {
                   ...JSON.parse(JSON.stringify(template)),
                   id: createBlankProject(template.name).id,
@@ -171,16 +366,113 @@ export default function DashboardPage() {
                   createdAt: Date.now(),
                   updatedAt: Date.now(),
                 };
-                useProjectStore.getState().save(project);
+                if (!(await useProjectStore.getState().save(project))) return;
                 loadProject(project);
                 router.push(`/editor/${project.id}`);
+              }}
+              onFillTemplate={async (template, data) => {
+                const project = fillTemplateFromData(
+                  template,
+                  data,
+                  template.name,
+                );
+                if (!(await useProjectStore.getState().save(project))) return;
+                loadProject(project);
+                router.push(`/editor/${project.id}`);
+              }}
+              onEditTemplate={async (template) => {
+                const project = {
+                  ...JSON.parse(JSON.stringify(template)),
+                  id: createBlankProject(template.name).id,
+                  name: template.name,
+                  createdAt: Date.now(),
+                  updatedAt: Date.now(),
+                };
+                if (!(await useProjectStore.getState().save(project))) return;
+                loadProject(project);
+                router.push(
+                  `/editor/${project.id}?editTemplate=${encodeURIComponent(template.id)}`,
+                );
+              }}
+              onDeleteTemplate={(template) => {
+                useCustomTemplateStore.getState().delete(template.id);
               }}
             />
           </TabsContent>
         </Tabs>
       </main>
 
-      <GeneratorDialog open={generatorOpen} onOpenChange={setGeneratorOpen} />
+      <GeneratorDialog
+        open={generatorOpen}
+        remixProject={remixProject}
+        onOpenChange={(open) => {
+          setGeneratorOpen(open);
+          if (!open) setRemixProject(null);
+        }}
+      />
+      <Dialog open={folderDialogOpen} onOpenChange={setFolderDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {folderIdToEdit ? "Rename folder" : "Create folder"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="folder-name">Folder name</Label>
+            <Input
+              id="folder-name"
+              value={folderName}
+              onChange={(event) => {
+                setFolderName(event.target.value);
+                setFolderError("");
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") handleSaveFolder();
+              }}
+              autoFocus
+            />
+            {folderError && (
+              <p className="text-sm text-destructive" role="alert">
+                {folderError}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSaveFolder} disabled={!folderName.trim()}>
+              {folderIdToEdit ? "Save folder" : "Create folder"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog
+        open={!!folderToDelete}
+        onOpenChange={(open) => !open && setFolderToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete folder?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {folderToDelete?.name} will be deleted. Projects in it will be
+              moved to Unfiled.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (folderToDelete) deleteFolder(folderToDelete.id);
+                  setSelectedFolderId("all");
+                  setFolderToDelete(null);
+                }}
+              >
+                Delete folder
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

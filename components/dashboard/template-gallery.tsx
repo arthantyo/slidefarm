@@ -1,55 +1,290 @@
-'use client';
+"use client";
 
-import type { Template } from '@/types';
-import { STARTER_TEMPLATES } from '@/lib/canvas/templates';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { SlideThumbnail } from '@/components/editor/slide-thumbnail';
-import { Badge } from '@/components/ui/badge';
+import { useState } from "react";
+import type { CustomTemplate, Template } from "@/types";
+import { STARTER_TEMPLATES } from "@/lib/canvas/templates";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { SlidePreview } from "@/components/dashboard/slide-preview";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { TemplateData } from "@/lib/canvas/template-filler";
+import { Pencil, Trash2 } from "lucide-react";
 
 interface TemplateGalleryProps {
   onUseTemplate: (template: Template) => void;
+  customTemplates: CustomTemplate[];
+  onFillTemplate: (template: CustomTemplate, data: TemplateData) => void;
+  onEditTemplate: (template: CustomTemplate) => void;
+  onDeleteTemplate: (template: CustomTemplate) => void;
 }
 
-export function TemplateGallery({ onUseTemplate }: TemplateGalleryProps) {
+function getPlaceholderKeys(
+  template: Template,
+  type: "text" | "image",
+): string[] {
+  const keys = new Set<string>();
+  for (const slide of template.slides) {
+    for (const element of slide.elements) {
+      if (element.type === type && element.placeholder)
+        keys.add(element.placeholder);
+    }
+  }
+  return Array.from(keys).sort();
+}
+
+function getTextPlaceholderCounts(template: Template): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const slide of template.slides) {
+    for (const element of slide.elements) {
+      if (element.type === 'text' && element.placeholder) {
+        counts.set(element.placeholder, (counts.get(element.placeholder) ?? 0) + 1);
+      }
+    }
+  }
+  return counts;
+}
+
+export function TemplateGallery({
+  onUseTemplate,
+  customTemplates,
+  onFillTemplate,
+  onEditTemplate,
+  onDeleteTemplate,
+}: TemplateGalleryProps) {
+  const [templateToFill, setTemplateToFill] = useState<CustomTemplate | null>(
+    null,
+  );
+  const [jsonValue, setJsonValue] = useState("{}");
+  const [jsonError, setJsonError] = useState("");
+  const [templateToDelete, setTemplateToDelete] = useState<CustomTemplate | null>(null);
+  const templates: Template[] = [...STARTER_TEMPLATES, ...customTemplates];
+
+  const openFillDialog = (template: CustomTemplate) => {
+    const placeholderCounts = getTextPlaceholderCounts(template);
+    setTemplateToFill(template);
+    setJsonValue(
+      JSON.stringify(
+        Object.fromEntries(
+          Array.from(placeholderCounts, ([key, count]) => [
+            key,
+            count > 1 ? Array<string>(count).fill("") : "",
+          ]),
+        ),
+        null,
+        2,
+      ),
+    );
+    setJsonError("");
+  };
+
+  const handleFill = () => {
+    if (!templateToFill) return;
+    try {
+      const parsed: unknown = JSON.parse(jsonValue);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("Enter a JSON object with placeholder keys.");
+      }
+      const data: TemplateData = {};
+      for (const [key, value] of Object.entries(parsed)) {
+        if (Array.isArray(value)) {
+          if (
+            !value.every(
+              (item) =>
+                typeof item === "string" ||
+                typeof item === "number" ||
+                typeof item === "boolean",
+            )
+          ) {
+            throw new Error(`Every value for "${key}" must be text or a number.`);
+          }
+          data[key] = value.map(String);
+        } else if (
+          typeof value === "string" ||
+          typeof value === "number" ||
+          typeof value === "boolean"
+        ) {
+          data[key] = String(value);
+        } else {
+          throw new Error(`The value for "${key}" must be text or a number.`);
+        }
+      }
+      onFillTemplate(templateToFill, data);
+      setTemplateToFill(null);
+    } catch (error) {
+      setJsonError(
+        error instanceof Error ? error.message : "Could not read JSON.",
+      );
+    }
+  };
+
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {STARTER_TEMPLATES.map((template) => {
-        const aspectRatio = template.dimensions.width / template.dimensions.height;
-        return (
-          <Card
-            key={template.id}
-            className="group cursor-pointer overflow-hidden p-0 transition-all hover:shadow-lg hover:border-primary/30"
-            onClick={() => onUseTemplate(template)}
-          >
-            <div
-              className="relative overflow-hidden bg-muted"
-              style={{ aspectRatio: `${aspectRatio}` }}
+    <>
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {templates.map((template) => {
+          const customTemplate = customTemplates.find(
+            (item) => item.id === template.id,
+          );
+          const aspectRatio =
+            template.dimensions.width / template.dimensions.height;
+          return (
+            <Card
+              key={template.id}
+              className="group overflow-hidden p-0 transition-all hover:shadow-lg hover:border-primary/30"
             >
-              <SlideThumbnail
-                slide={template.slides[0]}
-                width={template.dimensions.width}
-                height={template.dimensions.height}
-                theme={template.theme}
-              />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/30 group-hover:opacity-100">
-                <Button size="sm">Use Template</Button>
+              <div
+                className="relative overflow-hidden bg-muted"
+                style={{ aspectRatio: `${aspectRatio}` }}
+              >
+                <SlidePreview
+                  slide={template.slides[0]}
+                  width={template.dimensions.width}
+                  height={template.dimensions.height}
+                  theme={template.theme}
+                />
               </div>
-            </div>
-            <div className="p-3">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="truncate text-sm font-semibold">{template.name}</h3>
-                <Badge variant="secondary" className="shrink-0 text-xs">
-                  {template.category}
-                </Badge>
+              <div className="p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="truncate text-sm font-semibold">
+                    {template.name}
+                  </h3>
+                  <Badge variant="secondary" className="shrink-0 text-xs">
+                    {template.category ||
+                      (customTemplate ? "Custom" : "Starter")}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                  {template.description}
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => onUseTemplate(template)}
+                  >
+                    Use template
+                  </Button>
+                  {customTemplate && (
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => openFillDialog(customTemplate)}
+                    >
+                      Fill with JSON
+                    </Button>
+                  )}
+                </div>
+                {customTemplate && (
+                  <div className="mt-1 flex justify-end gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      title="Edit template"
+                      aria-label={`Edit ${customTemplate.name}`}
+                      onClick={() => onEditTemplate(customTemplate)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      title="Delete template"
+                      aria-label={`Delete ${customTemplate.name}`}
+                      onClick={() => setTemplateToDelete(customTemplate)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                {template.description}
+            </Card>
+          );
+        })}
+      </div>
+
+      <Dialog
+        open={!!templateToFill}
+        onOpenChange={(open) => !open && setTemplateToFill(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Fill {templateToFill?.name}</DialogTitle>
+            <DialogDescription>
+              Paste a JSON object. Array values fill repeated text keys in slide order;
+              image slots stay unchanged for you to replace manually.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={jsonValue}
+            onChange={(e) => setJsonValue(e.target.value)}
+            className="min-h-48 font-mono text-xs"
+            aria-label="Template JSON data"
+            spellCheck={false}
+          />
+          {templateToFill &&
+            getPlaceholderKeys(templateToFill, "image").length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Manual image slots:{" "}
+                {getPlaceholderKeys(templateToFill, "image").join(", ")}
               </p>
-            </div>
-          </Card>
-        );
-      })}
-    </div>
+            )}
+          {jsonError && (
+            <p className="text-sm text-destructive" role="alert">
+              {jsonError}
+            </p>
+          )}
+          <DialogFooter>
+            <Button onClick={handleFill}>Create project</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={!!templateToDelete}
+        onOpenChange={(open) => !open && setTemplateToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {templateToDelete?.name} will be removed from your template gallery. Existing projects made from it will not be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (templateToDelete) onDeleteTemplate(templateToDelete);
+                  setTemplateToDelete(null);
+                }}
+              >
+                Delete template
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

@@ -2,6 +2,8 @@
 
 import { memo } from 'react';
 import type { Slide, Theme, CanvasElement, BackgroundElement, TextElement, ShapeElement, ImageElement } from '@/types';
+import { getTextFontWeight, isTextItalic } from '@/lib/canvas/text-style';
+import { elementsInLayerOrder } from '@/lib/canvas/layers';
 
 interface SlideThumbnailProps {
   slide: Slide;
@@ -54,10 +56,6 @@ function renderElement(el: CanvasElement, key: string, scale: number): React.Rea
 
   if (el.type === 'text') {
     const t = el as TextElement;
-    const fontStyle = t.fontStyle === 'bold-italic' ? 'bold italic'
-      : t.fontStyle === 'bold' ? 'bold'
-      : t.fontStyle === 'italic' ? 'italic'
-      : 'normal';
     return (
       <div
         key={key}
@@ -69,8 +67,8 @@ function renderElement(el: CanvasElement, key: string, scale: number): React.Rea
           color: t.fill,
           fontSize: t.fontSize * scale,
           fontFamily: t.fontFamily,
-          fontStyle: fontStyle.includes('italic') ? 'italic' : 'normal',
-          fontWeight: fontStyle.includes('bold') ? 'bold' : 'normal',
+          fontStyle: isTextItalic(t) ? 'italic' : 'normal',
+          fontWeight: getTextFontWeight(t),
           textDecoration: t.textDecoration,
           lineHeight: t.lineHeight,
           letterSpacing: `${t.letterSpacing * scale}px`,
@@ -160,11 +158,12 @@ function SlideThumbnailBase({ slide, width, height, theme, maxWidth = 200, maxHe
         width: scaledWidth,
         height: scaledHeight,
         overflow: 'hidden',
+        backgroundColor: '#ffffff',
         borderRadius: 4,
         flexShrink: 0,
       }}
     >
-      {slide.elements.map((el) => renderElement(el, el.id, scale))}
+      {elementsInLayerOrder(slide.elements).map((el) => renderElement(el, el.id, scale))}
     </div>
   );
 }

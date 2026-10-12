@@ -1,13 +1,14 @@
 const fontStylesheets = new Map<string, Promise<void>>();
 
-function loadFontStylesheet(fontFamily: string): Promise<void> {
-  const existing = fontStylesheets.get(fontFamily);
+function loadFontStylesheet(fontFamily: string, fontWeight: number, fontStyle: "normal" | "italic"): Promise<void> {
+  const key = `${fontFamily}:${fontStyle}:${fontWeight}`;
+  const existing = fontStylesheets.get(key);
   if (existing) return existing;
 
   const promise = new Promise<void>((resolve) => {
     const link = document.createElement("link");
     const params = new URLSearchParams({
-      family: `${fontFamily}:ital,wght@0,400;0,700;1,400;1,700`,
+      family: `${fontFamily}:ital,wght@${fontStyle === "italic" ? 1 : 0},${fontWeight}`,
       display: "swap",
     });
     link.rel = "stylesheet";
@@ -17,17 +18,17 @@ function loadFontStylesheet(fontFamily: string): Promise<void> {
     document.head.appendChild(link);
   });
 
-  fontStylesheets.set(fontFamily, promise);
+  fontStylesheets.set(key, promise);
   return promise;
 }
 
 export async function loadFont(
   fontFamily: string,
-  fontWeight: "normal" | "bold" = "normal",
+  fontWeight = 400,
   fontStyle: "normal" | "italic" = "normal",
 ): Promise<void> {
   if (typeof document === "undefined" || !fontFamily) return;
 
-  await loadFontStylesheet(fontFamily);
+  await loadFontStylesheet(fontFamily, fontWeight, fontStyle);
   await document.fonts.load(`${fontStyle} ${fontWeight} 16px "${fontFamily}"`);
 }

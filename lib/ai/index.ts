@@ -24,6 +24,7 @@ Rules:
 - For list slides, provide 3-7 items
 - Always end with a call-to-action slide
 - Vary slide types for visual interest
+- Include bodyText on every slide; use an empty string when the slide has no body copy
 - Respond ONLY with valid JSON matching the specified schema`;
 
 const STYLE_HINTS: Record<VisualStyle, string> = {

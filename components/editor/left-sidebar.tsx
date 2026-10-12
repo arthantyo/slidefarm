@@ -7,32 +7,28 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
-  Type, Image as ImageIcon, Shapes, Upload, Layers,
+  Type, Image as ImageIcon, Shapes, Upload,
   Square, Circle, Triangle as TriangleIcon, Star, Minus,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import type { ShapeKind } from '@/types';
 import { FONT_OPTIONS, COLOR_PALETTE } from '@/lib/canvas/themes';
 import { ImageUrlInput, FileUpload } from './sidebar/image-upload-tab';
-import { SlideThumbnail } from './slide-thumbnail';
 
-type Tab = 'slides' | 'text' | 'shapes' | 'images' | 'uploads' | 'ai' | 'templates';
+type Tab = 'text' | 'shapes' | 'images' | 'uploads' | 'ai' | 'templates';
 
 interface LeftSidebarProps {
   onOpenGenerator?: () => void;
 }
 
 export function LeftSidebar({ onOpenGenerator }: LeftSidebarProps) {
-  const [tab, setTab] = useState<Tab>('slides');
+  const [tab, setTab] = useState<Tab>('text');
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { project, currentSlideId } = useEditorStore();
-  const { addElement, addSlide, setCurrentSlide, deleteSlide, duplicateSlide } = useEditorStore();
+  const { project, addElement } = useEditorStore();
 
   if (!project) return null;
 
-  const currentSlide = project.slides.find((s) => s.id === currentSlideId);
-
-  const addText = (preset: 'heading' | 'subheading' | 'body') => {
+  const addText = (preset: 'heading' | 'subheading' | 'body', fontFamily?: string) => {
     const w = project.dimensions.width * 0.7;
     const h = project.dimensions.height * 0.1;
     const el = createTextElement({
@@ -44,7 +40,7 @@ export function LeftSidebar({ onOpenGenerator }: LeftSidebarProps) {
       fontSize: preset === 'heading' ? 72 : preset === 'subheading' ? 48 : 28,
       fontStyle: preset === 'heading' ? 'bold' : 'normal',
       fill: project.theme.text,
-      fontFamily: preset === 'heading' ? project.theme.fontHeading : project.theme.fontBody,
+      fontFamily: fontFamily ?? (preset === 'heading' ? project.theme.fontHeading : project.theme.fontBody),
       name: preset === 'heading' ? 'Heading' : preset === 'subheading' ? 'Subheading' : 'Body Text',
     });
     addElement(el);
@@ -83,7 +79,6 @@ export function LeftSidebar({ onOpenGenerator }: LeftSidebarProps) {
   };
 
   const tabs: { key: Tab; icon: typeof Type; label: string }[] = [
-    { key: 'slides', icon: Layers, label: 'Slides' },
     { key: 'text', icon: Type, label: 'Text' },
     { key: 'shapes', icon: Shapes, label: 'Shapes' },
     { key: 'images', icon: ImageIcon, label: 'Images' },
@@ -133,63 +128,6 @@ export function LeftSidebar({ onOpenGenerator }: LeftSidebarProps) {
         <div className="w-64 border-r border-border bg-card">
           <ScrollArea className="h-full">
             <div className="p-3">
-              {tab === 'slides' && (
-                <div className="space-y-2">
-                  <h3 className="mb-2 text-sm font-semibold">Slides</h3>
-                  {project.slides.map((slide, idx) => (
-                    <div
-                      key={slide.id}
-                      onClick={() => setCurrentSlide(slide.id)}
-                      className={`group relative cursor-pointer rounded-lg border-2 p-2 transition-all ${
-                        slide.id === currentSlideId ? 'border-primary' : 'border-transparent hover:border-border'
-                      }`}
-                    >
-                      <div className="mb-1 flex items-center justify-between">
-                        <span className="text-xs font-medium text-muted-foreground">{idx + 1}</span>
-                        <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); duplicateSlide(slide.id); }}
-                            className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                            title="Duplicate"
-                          >
-                            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                          </button>
-                          {project.slides.length > 1 && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); deleteSlide(slide.id); }}
-                              className="rounded p-1 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
-                              title="Delete"
-                            >
-                              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      {/* Proper scaled thumbnail */}
-                      <div className="overflow-hidden rounded border border-border bg-muted/30">
-                        <SlideThumbnail
-                          slide={slide}
-                          width={project.dimensions.width}
-                          height={project.dimensions.height}
-                          theme={project.theme}
-                          maxWidth={224}
-                          maxHeight={140}
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => addSlide()}
-                  >
-                    + Add Slide
-                  </Button>
-                </div>
-              )}
-
               {tab === 'text' && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold">Add Text</h3>
@@ -208,7 +146,7 @@ export function LeftSidebar({ onOpenGenerator }: LeftSidebarProps) {
                   {FONT_OPTIONS.slice(0, 8).map((font) => (
                     <button
                       key={font}
-                      onClick={() => addText('body')}
+                      onClick={() => addText('body', font)}
                       className="block w-full truncate rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
                       style={{ fontFamily: font }}
                     >
