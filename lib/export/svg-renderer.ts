@@ -1,4 +1,6 @@
-import type { Slide, Theme, CanvasElement, BackgroundElement, TextElement, ShapeElement, ImageElement } from '@/types';
+import type { Slide, CanvasElement, BackgroundElement, TextElement, ShapeElement, ImageElement } from '@/types';
+import { getWrappedLines } from './text-wrap';
+import { renderSlideToCanvas } from './canvas-renderer';
 
 function renderElementToSVG(el: CanvasElement, width: number, height: number): string {
   if (!el.visible) return '';
@@ -26,19 +28,37 @@ function renderElementToSVG(el: CanvasElement, width: number, height: number): s
       : 'normal';
     const fontWeight = fontStyle.includes('bold') ? 'bold' : 'normal';
     const fontStyleAttr = fontStyle.includes('italic') ? 'italic' : 'normal';
-    const anchor = t.align === 'center' ? 'middle' : t.align === 'right' ? 'end' : 'start';
-    const textX = t.align === 'center' ? t.x + t.width / 2 : t.align === 'right' ? t.x + t.width - t.padding : t.x + t.padding;
-    const textY = t.verticalAlign === 'middle' ? t.y + t.height / 2 : t.verticalAlign === 'bottom' ? t.y + t.height - t.padding : t.y + t.padding;
 
-    // Split text into lines for proper rendering
-    const lines = t.text.split('\n');
-    const lineHeight = t.fontSize * t.lineHeight;
+    const padding = t.padding || 0;
+    const maxWidth = Math.max(10, t.width - padding * 2);
+
+    const lines = getWrappedLines(
+      t.text,
+      maxWidth,
+      t.fontFamily,
+      t.fontSize,
+      fontWeight,
+      fontStyleAttr,
+      t.letterSpacing
+    );
+
+    const lineHeight = t.fontSize * (t.lineHeight || 1.3);
+    const totalTextHeight = lines.length * lineHeight;
+    const availableHeight = Math.max(10, t.height - padding * 2);
+
+    let startY = t.y + padding;
+    if (t.verticalAlign === 'middle') {
+      startY = t.y + padding + (availableHeight - totalTextHeight) / 2;
+    } else if (t.verticalAlign === 'bottom') {
+      startY = t.y + t.height - padding - totalTextHeight;
+    }
+
+    const anchor = t.align === 'center' ? 'middle' : t.align === 'right' ? 'end' : 'start';
+    const textX = t.align === 'center' ? t.x + t.width / 2 : t.align === 'right' ? t.x + t.width - padding : t.x + padding;
 
     return `<g${transform}${opacity}>${lines.map((line, i) => {
-      const y = t.verticalAlign === 'middle'
-        ? textY - ((lines.length - 1) * lineHeight) / 2 + i * lineHeight
-        : textY + i * lineHeight;
-      return `<text x="${textX}" y="${y}" font-family="${t.fontFamily}" font-size="${t.fontSize}" font-weight="${fontWeight}" font-style="${fontStyleAttr}" fill="${t.fill}" text-anchor="${anchor}" letter-spacing="${t.letterSpacing}">${escapeXML(line)}</text>`;
+      const y = startY + i * lineHeight;
+      return `<text x="${textX}" y="${y}" font-family="${t.fontFamily}" font-size="${t.fontSize}" font-weight="${fontWeight}" font-style="${fontStyleAttr}" fill="${t.fill}" text-anchor="${anchor}" letter-spacing="${t.letterSpacing}" dominant-baseline="hanging">${escapeXML(line)}</text>`;
     }).join('')}</g>`;
   }
 
@@ -98,34 +118,19 @@ export function slideToSVG(slide: Slide, width: number, height: number): string 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${elements}</svg>`;
 }
 
-export function slideToDataURL(slide: Slide, width: number, height: number, type: 'png' | 'jpeg' = 'png', quality = 1): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const svg = slideToSVG(slide, width, height);
-    const blob = new Blob([svg], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        URL.revokeObjectURL(url);
-        reject(new Error('Canvas not supported'));
-        return;
-      }
-      ctx.drawImage(img, 0, 0, width, height);
-      URL.revokeObjectURL(url);
-      const dataUrl = canvas.toDataURL(type === 'png' ? 'image/png' : 'image/jpeg', quality);
-      resolve(dataUrl);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Failed to render slide'));
-    };
-    img.src = url;
-  });
+export async function slideToDataURL(
+  slide: Slide,
+  width: number,
+  height: number,
+  type: 'png' | 'jpeg' = 'png',
+  quality = 1
+): Promise<string> {
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    await renderSlideToCanvas(slide, canvas, width, height);
+    return canvas.toDataURL(type === 'png' ? 'image/png' : 'image/jpeg', quality);
+  }
+  return '';
 }
 
 export async function dataUrlToBlob(dataUrl: string): Promise<Blob> {

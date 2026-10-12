@@ -1,7 +1,8 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+import React from 'react';
 import type { Slide, Theme, CanvasElement } from '@/types';
+import { CanvasViewport } from './viewport/canvas-viewport';
 
 interface CanvasStageWrapperProps {
   slide: Slide;
@@ -15,15 +16,24 @@ interface CanvasStageWrapperProps {
   onDeselectAll: () => void;
 }
 
-const CanvasStageInner = dynamic(() => import('./canvas-stage-inner'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-full w-full items-center justify-center">
-      <div className="text-sm text-muted-foreground">Loading canvas...</div>
-    </div>
-  ),
-});
-
-export function CanvasStage(props: CanvasStageWrapperProps) {
-  return <CanvasStageInner {...props} />;
+export function CanvasStage({
+  slide,
+  width,
+  height,
+  selectedElementIds,
+  onSelectElement,
+  onUpdateElement,
+  onDeselectAll,
+}: CanvasStageWrapperProps) {
+  return (
+    <CanvasViewport
+      slide={slide}
+      width={width}
+      height={height}
+      selectedElementIds={selectedElementIds}
+      onSelectElement={onSelectElement}
+      onUpdateElement={onUpdateElement}
+      onDeselectAll={onDeselectAll}
+    />
+  );
 }

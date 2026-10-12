@@ -63,8 +63,13 @@ interface EditorState {
   canUndo: () => boolean;
   canRedo: () => boolean;
 
-  // Zoom
+  // Zoom & Viewport
   setZoom: (zoom: number) => void;
+  pan: { x: number; y: number };
+  setPan: (pan: { x: number; y: number } | ((prev: { x: number; y: number }) => { x: number; y: number })) => void;
+  resetView: () => void;
+  activeTool: 'select' | 'hand';
+  setActiveTool: (tool: 'select' | 'hand') => void;
 
   // Dirty
   markClean: () => void;
@@ -92,6 +97,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedElementIds: [],
   clipboard: null,
   zoom: 0.5,
+  pan: { x: 0, y: 0 },
+  activeTool: 'select',
   isGenerating: false,
   generationProgress: null,
   history: { past: [], future: [] },
@@ -104,6 +111,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     history: { past: [], future: [] },
     isDirty: false,
     zoom: 0.5,
+    pan: { x: 0, y: 0 },
+    activeTool: 'select',
   }),
 
   updateProjectName: (name) => set((s) => ({
@@ -111,10 +120,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     isDirty: true,
   })),
 
-  updateDimensions: (dimensions) => set((s) => ({
-    project: s.project ? { ...s.project, dimensions, updatedAt: Date.now() } : null,
-    isDirty: true,
-  })),
+  updateDimensions: (dimensions) => set((s) => {
+    if (!s.project) return {};
+    const updatedSlides = s.project.slides.map((slide) => ({
+      ...slide,
+      elements: slide.elements.map((el) =>
+        el.type === 'background'
+          ? { ...el, width: dimensions.width, height: dimensions.height }
+          : el,
+      ),
+    }));
+    return {
+      project: {
+        ...s.project,
+        dimensions,
+        slides: updatedSlides,
+        updatedAt: Date.now(),
+      },
+      isDirty: true,
+    };
+  }),
 
   updateTheme: (theme) => set((s) => ({
     project: s.project
@@ -473,6 +498,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   canRedo: () => get().history.future.length > 0,
 
   setZoom: (zoom) => set({ zoom: Math.max(0.05, Math.min(3, zoom)) }),
+
+  setPan: (pan) => set((s) => ({
+    pan: typeof pan === 'function' ? pan(s.pan) : pan,
+  })),
+
+  resetView: () => set({ pan: { x: 0, y: 0 }, zoom: 0.5 }),
+
+  setActiveTool: (activeTool) => set({ activeTool }),
 
   markClean: () => set({ isDirty: false }),
 }));

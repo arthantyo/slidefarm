@@ -109,8 +109,3 @@ input[type="range"]::-webkit-slider-thumb {
   cursor: pointer;
   border: 2px solid hsl(var(--background));
 }
-
-/* Konva canvas selection outline */
-.konvajs-content {
-  border-radius: 8px;
-}
