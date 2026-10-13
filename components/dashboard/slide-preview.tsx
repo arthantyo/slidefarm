@@ -9,9 +9,10 @@ interface SlidePreviewProps {
   width: number;
   height: number;
   theme: Theme;
+  fit?: 'contain' | 'cover';
 }
 
-export function SlidePreview({ slide, width, height, theme }: SlidePreviewProps) {
+export function SlidePreview({ slide, width, height, theme, fit = 'contain' }: SlidePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
@@ -43,6 +44,7 @@ export function SlidePreview({ slide, width, height, theme }: SlidePreviewProps)
           theme={theme}
           maxWidth={size.width}
           maxHeight={size.height}
+          fit={fit}
         />
       )}
     </div>

@@ -182,8 +182,6 @@ export function TemplateGallery({
           const customTemplate = customTemplates.find(
             (item) => item.id === template.id,
           );
-          const aspectRatio =
-            template.dimensions.width / template.dimensions.height;
           const category =
             template.category || (customTemplate ? "Custom" : "Starter");
           const actions = (
@@ -226,7 +224,6 @@ export function TemplateGallery({
           );
 
           if (layout === "list") {
-            const thumbWidth = Math.max(48, Math.min(112, Math.round(72 * aspectRatio)));
             return (
               <Card
                 key={template.id}
@@ -234,13 +231,14 @@ export function TemplateGallery({
               >
                 <div
                   className="relative shrink-0 overflow-hidden rounded-md bg-muted"
-                  style={{ width: thumbWidth, height: 72 }}
+                  style={{ width: 128, height: 72 }}
                 >
                   <SlidePreview
                     slide={template.slides[0]}
                     width={template.dimensions.width}
                     height={template.dimensions.height}
                     theme={template.theme}
+                    fit="cover"
                   />
                 </div>
                 <div className="min-w-0 flex-1 px-1 sm:px-0">
@@ -268,13 +266,14 @@ export function TemplateGallery({
             >
               <div
                 className="relative overflow-hidden bg-muted"
-                style={{ aspectRatio: `${aspectRatio}` }}
+                style={{ aspectRatio: '16 / 9' }}
               >
                 <SlidePreview
                   slide={template.slides[0]}
                   width={template.dimensions.width}
                   height={template.dimensions.height}
                   theme={template.theme}
+                  fit="cover"
                 />
               </div>
               <div className="p-3">

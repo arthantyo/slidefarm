@@ -16,7 +16,7 @@ export function DashboardHeader({
   isDark,
 }: DashboardHeaderProps) {
   const { theme, setTheme } = useTheme();
-  const dark = isDark ?? theme === 'dark';
+  const dark = isDark ?? theme === "dark";
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3.5">
@@ -29,13 +29,31 @@ export function DashboardHeader({
           </div>
         </div>
 
-        <nav className="flex items-center gap-1 sm:gap-3" aria-label="Main navigation">
-          <Link href="/" className="rounded-md px-2 py-1 text-sm hover:bg-accent">Dashboard</Link>
-          <Link href="/workflows" className="rounded-md px-2 py-1 text-sm hover:bg-accent">Workflows</Link>
-          <Link href="/media" className="rounded-md px-2 py-1 text-sm hover:bg-accent">Media</Link>
+        <nav
+          className="flex items-center gap-1 sm:gap-3"
+          aria-label="Main navigation"
+        >
+          <Link
+            href="/"
+            className="rounded-md px-2 py-1 text-sm hover:bg-accent"
+          >
+            Dashboard
+          </Link>
+          <Link
+            href="/workflows"
+            className="rounded-md px-2 py-1 text-sm hover:bg-accent"
+          >
+            Workflows
+          </Link>
+          <Link
+            href="/media"
+            className="rounded-md px-2 py-1 text-sm hover:bg-accent"
+          >
+            Media
+          </Link>
         </nav>
         <button
-          onClick={onToggleTheme ?? (() => setTheme(dark ? 'light' : 'dark'))}
+          onClick={onToggleTheme ?? (() => setTheme(dark ? "light" : "dark"))}
           className="flex h-9 w-9 items-center justify-center rounded-lg border border-border transition-colors hover:bg-accent"
           aria-label="Toggle theme"
         >

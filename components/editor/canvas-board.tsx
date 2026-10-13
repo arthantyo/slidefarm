@@ -133,14 +133,34 @@ export function CanvasBoard({
     const target = event.target instanceof Element
       ? event.target.closest<HTMLElement>('[data-canvas-element-id]')
       : null;
-    const elementId = target?.dataset.canvasElementId;
+    let elementId = target?.dataset.canvasElementId;
+    if (!elementId && boardRef.current) {
+      const rect = boardRef.current.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / zoom;
+      const y = (event.clientY - rect.top) / zoom;
+      const lockedElement = [...otherElements].reverse().find((element) => {
+        if (!element.visible || !element.locked) return false;
+        const centerX = element.x + element.width / 2;
+        const centerY = element.y + element.height / 2;
+        const angle = -(element.rotation ?? 0) * Math.PI / 180;
+        const dx = x - centerX;
+        const dy = y - centerY;
+        const localX = dx * Math.cos(angle) - dy * Math.sin(angle) + centerX;
+        const localY = dx * Math.sin(angle) + dy * Math.cos(angle) + centerY;
+        return localX >= element.x && localX <= element.x + element.width &&
+          localY >= element.y && localY <= element.y + element.height;
+      });
+      elementId = lockedElement?.id;
+    }
     if (!elementId || !otherElements.some((element) => element.id === elementId)) {
       event.preventDefault();
       setContextElementId(null);
       return;
     }
     setContextElementId(elementId);
-    onSelectElement(elementId);
+    if (!otherElements.find((element) => element.id === elementId)?.locked) {
+      onSelectElement(elementId);
+    }
   };
 
   const copyContextElement = () => {

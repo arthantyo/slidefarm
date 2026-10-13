@@ -36,7 +36,7 @@ export function ElementWrapper({
   }
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (!selectionEnabled) return;
+    if (!selectionEnabled || element.locked) return;
     // Left click only
     if (e.button !== 0) return;
     e.stopPropagation();
@@ -63,6 +63,7 @@ export function ElementWrapper({
         transformOrigin: 'center center',
         opacity: element.opacity,
         touchAction: 'none',
+        pointerEvents: element.locked ? 'none' : undefined,
       }}
     >
       {element.type === 'text' && (

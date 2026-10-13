@@ -12,6 +12,7 @@ interface SlideThumbnailProps {
   theme: Theme;
   maxWidth?: number;
   maxHeight?: number;
+  fit?: 'contain' | 'cover';
   className?: string;
 }
 
@@ -147,8 +148,10 @@ function renderElement(el: CanvasElement, key: string, scale: number): React.Rea
   return null;
 }
 
-function SlideThumbnailBase({ slide, width, height, theme, maxWidth = 200, maxHeight = 300, className }: SlideThumbnailProps) {
-  const scale = Math.min(maxWidth / width, maxHeight / height);
+function SlideThumbnailBase({ slide, width, height, theme, maxWidth = 200, maxHeight = 300, fit = 'contain', className }: SlideThumbnailProps) {
+  const scale = fit === 'cover'
+    ? Math.max(maxWidth / width, maxHeight / height)
+    : Math.min(maxWidth / width, maxHeight / height);
   const scaledWidth = width * scale;
   const scaledHeight = height * scale;
 

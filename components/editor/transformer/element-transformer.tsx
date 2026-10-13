@@ -218,7 +218,7 @@ export function ElementTransformer({
         data-canvas-element-id={element.id}
         onPointerDown={handleDragPointerDown}
         className={`absolute z-30 border-2 border-primary ${
-          isEditing ? 'pointer-events-none' : 'pointer-events-auto'
+          isEditing || element.locked ? 'pointer-events-none' : 'pointer-events-auto'
         } ${
           element.locked ? 'border-dashed border-muted-foreground/60' : isEditing ? '' : 'cursor-move'
         }`}
