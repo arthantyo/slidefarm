@@ -1,8 +1,8 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { fillTemplateFromData } from '@/lib/canvas/template-filler';
-import { parseSourceJson, sourceToTemplateData } from '@/lib/workflows/data';
 import { exportWorkflowToMedia } from '@/lib/workflows/export-media';
 import { useProjectStore } from '@/stores/project-store';
 import { nodeType, reachableNodes, workflowConnections } from '@/lib/workflows/graph';
@@ -11,6 +11,7 @@ import type { useWorkflowDocument } from './use-workflow-document';
 
 export function useWorkflowExecution(workflowId: string, document: ReturnType<typeof useWorkflowDocument>, onReviewOpen: () => void) {
   const router = useRouter();
+  const resumed = useRef(false);
   const { draft, workflows, nodes, template, keys, folders, reviewProject, setDraft, setReviewProject, setReviewSlideIndex, persist, setBusy, setError, setMessage, setStatuses, setNodeStatus } = document;
   const exportNodes = (afterReview: boolean): NodeId[] => {
     if (!draft) return [];
@@ -74,50 +75,38 @@ export function useWorkflowExecution(workflowId: string, document: ReturnType<ty
       if (!template) throw new Error('Choose a template.');
       if (template.slides.length === 0) throw new Error('The template has no slides.');
       setStatuses({ source: 'processing' });
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      const source = parseSourceJson(draft.sourceJson);
-      let data = draft.sourceType === 'json' ? sourceToTemplateData(source) : {};
-      if (draft.sourceType === 'ai') {
-        if (!draft.systemPrompt.trim()) throw new Error('Enter an AI system prompt.');
-        if (!keys.length) throw new Error('This template has no placeholders for the AI agent to fill.');
-        const imageSubjectKeys = Array.from(new Set(template.slides.flatMap((slide) => slide.elements.flatMap((element) => element.type === 'image' && element.placeholder && (element.usePlaceholderAsSubject ?? Boolean(element.aiPlaceholderPrompt?.trim())) ? [element.placeholder] : []))));
-        const response = await fetch('/api/ai/workflow-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ systemPrompt: draft.systemPrompt, source, placeholderKeys: keys, imageSubjectKeys }) });
-        const result = await response.json() as { data?: Record<string, string | string[]>; error?: string };
-        if (!response.ok || !result.data) throw new Error(result.error || 'AI generation failed.');
-        data = result.data;
-        const imageSourceKeys = new Set(template.slides.flatMap((slide) => slide.elements.flatMap((element) => element.type === 'image' && element.placeholder && !(element.usePlaceholderAsSubject ?? Boolean(element.aiPlaceholderPrompt?.trim())) ? [element.placeholder] : [])));
-        if (imageSourceKeys.size) {
-          const sourceData = sourceToTemplateData(source);
-          for (const key of Array.from(imageSourceKeys)) {
-            const value = sourceData[key];
-            if (!value || (Array.isArray(value) ? value.some((part) => !part.trim()) : !value.trim())) throw new Error(`Enter an image URL or data URL for ${key} in Input JSON.`);
-            data[key] = value;
-          }
-        }
+      const jobKey = `slidefarm-workflow-job:${draft.id}`;
+      let jobId = localStorage.getItem(jobKey);
+      if (!jobId) {
+        const queued = await fetch('/api/workflow-jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workflow: draft, template }) });
+        const result = await queued.json() as { jobId?: string; error?: string };
+        if (!queued.ok || !result.jobId) throw new Error(result.error || 'Could not queue workflow.');
+        jobId = result.jobId;
+        localStorage.setItem(jobKey, jobId);
       }
-      if (keys.length && keys.some((key) => !(key in data))) throw new Error(`Missing template values: ${keys.filter((key) => !(key in data)).join(', ')}`);
+      setMessage('Workflow queued. Generating content in the background.');
+      let job: { status: string; data?: Record<string, string | string[]>; images?: Record<string, string>; error?: string };
+      do {
+        const response = await fetch(`/api/workflow-jobs/${jobId}`, { cache: 'no-store' });
+        if (!response.ok) throw new Error('Could not load workflow job.');
+        ({ job } = await response.json() as { job: typeof job });
+        if (job.status === 'failed') { localStorage.removeItem(jobKey); throw new Error(job.error || 'Workflow failed.'); }
+        if (job.status !== 'ready' && job.status !== 'complete') await new Promise((resolve) => setTimeout(resolve, 2000));
+      } while (job.status !== 'ready' && job.status !== 'complete');
+      if (!job.data) throw new Error('Workflow job has no generated data.');
+      const data = job.data;
       setNodeStatus('source', 'complete');
       setNodeStatus('template', 'processing');
-      await new Promise((resolve) => setTimeout(resolve, 150));
       const project = fillTemplateFromData(template, data, `${draft.name} - ${new Date().toLocaleString()}`);
-      const imageOccurrences = new Map<string, number>();
-      for (let slideIndex = 0; slideIndex < template.slides.length; slideIndex++) {
-        for (let elementIndex = 0; elementIndex < template.slides[slideIndex].elements.length; elementIndex++) {
-          const original = template.slides[slideIndex].elements[elementIndex];
-          const target = project.slides[slideIndex].elements[elementIndex];
-          if (original.type !== 'image' || target.type !== 'image' || !original.placeholder || !(original.usePlaceholderAsSubject ?? Boolean(original.aiPlaceholderPrompt?.trim()))) continue;
-          if (!original.aiPlaceholderPrompt?.trim()) throw new Error(`Set an AI image base prompt for ${original.placeholder}.`);
-          const value = data[original.placeholder];
-          const index = imageOccurrences.get(original.placeholder) ?? 0;
-          imageOccurrences.set(original.placeholder, index + 1);
-          const subject = (Array.isArray(value) ? value[index] : value)?.trim();
-          if (!subject) throw new Error(`Missing image subject for ${original.placeholder}.`);
-          const prompt = `${original.aiPlaceholderPrompt.trim()} ${subject}`;
-          const response = await fetch('/api/ai/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, width: original.width, height: original.height }) });
-          const result = await response.json() as { src?: string; error?: string };
-          if (!response.ok || !result.src) throw new Error(result.error || `Could not generate image for ${original.placeholder}.`);
-          target.src = result.src;
-          target.imagePrompt = prompt;
+      for (const [location, src] of Object.entries(job.images ?? {})) {
+        const [slideIndex, elementIndex] = location.split(':').map(Number);
+        const target = project.slides[slideIndex]?.elements[elementIndex];
+        const original = template.slides[slideIndex]?.elements[elementIndex];
+        if (target?.type === 'image' && original?.type === 'image') {
+          target.src = src;
+          const value = data[original.placeholder ?? ''];
+          const subject = Array.isArray(value) ? value[0] : value;
+          target.imagePrompt = `${original.aiPlaceholderPrompt?.trim() ?? ''} ${subject ?? ''}`.trim();
         }
       }
       setNodeStatus('template', 'complete');
@@ -130,6 +119,9 @@ export function useWorkflowExecution(workflowId: string, document: ReturnType<ty
       }
       const saved = { ...draft, name: draft.name.trim(), pendingProjectId: hasReview ? project.id : null, updatedAt: Date.now() };
       await persist(workflows.some((item) => item.id === saved.id) ? workflows.map((item) => item.id === saved.id ? saved : item) : [...workflows, saved]);
+      const completed = await fetch(`/api/workflow-jobs/${jobId}`, { method: 'PATCH' });
+      if (!completed.ok) throw new Error('Could not mark workflow job complete.');
+      localStorage.removeItem(jobKey);
       setDraft(saved);
       if (hasReview) {
         setReviewProject(project);
@@ -149,5 +141,13 @@ export function useWorkflowExecution(workflowId: string, document: ReturnType<ty
       setError(cause instanceof Error ? cause.message : 'Workflow failed.');
     } finally { setBusy(false); }
   };
+  useEffect(() => {
+    if (!document.loaded || !draft || resumed.current) return;
+    if (!localStorage.getItem(`slidefarm-workflow-job:${draft.id}`)) return;
+    resumed.current = true;
+    void run();
+    // Resume the saved job once when the workflow document loads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [document.loaded, draft?.id]);
   return { run, continueWorkflow, openFullEditor };
 }
