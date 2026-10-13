@@ -107,7 +107,7 @@ const Cloudscape = ({
   speed = 1,
   height,
   className,
-  canvasOpacity = 0.55,
+  canvasOpacity = 0.75,
   style,
   ...props
 }: CloudscapeProps) => {

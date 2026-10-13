@@ -59,6 +59,7 @@ export const imageElementSchema = z.object({
   src: z.string(),
   imagePrompt: z.string().optional(),
   aiPlaceholderPrompt: z.string().optional(),
+  usePlaceholderAsSubject: z.boolean().optional(),
   objectFit: z.enum(['cover', 'contain', 'fill']),
   cornerRadius: z.number(),
   shadow: shadowSchema,

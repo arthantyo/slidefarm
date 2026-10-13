@@ -40,25 +40,11 @@ interface TemplateGalleryProps {
   onDeleteTemplate: (template: CustomTemplate) => Promise<boolean>;
 }
 
-function getPlaceholderKeys(
-  template: Template,
-  type: "text" | "image",
-): string[] {
-  const keys = new Set<string>();
-  for (const slide of template.slides) {
-    for (const element of slide.elements) {
-      if (element.type === type && element.placeholder)
-        keys.add(element.placeholder);
-    }
-  }
-  return Array.from(keys).sort();
-}
-
-function getTextPlaceholderCounts(template: Template): Map<string, number> {
+function getPlaceholderCounts(template: Template): Map<string, number> {
   const counts = new Map<string, number>();
   for (const slide of template.slides) {
     for (const element of slide.elements) {
-      if (element.type === 'text' && element.placeholder) {
+      if ((element.type === 'text' || element.type === 'image') && element.placeholder) {
         counts.set(element.placeholder, (counts.get(element.placeholder) ?? 0) + 1);
       }
     }
@@ -93,7 +79,7 @@ export function TemplateGallery({
   };
 
   const openFillDialog = (template: CustomTemplate) => {
-    const placeholderCounts = getTextPlaceholderCounts(template);
+    const placeholderCounts = getPlaceholderCounts(template);
     setTemplateToFill(template);
     setJsonValue(
       JSON.stringify(
@@ -343,8 +329,8 @@ export function TemplateGallery({
           <DialogHeader>
             <DialogTitle>Fill {templateToFill?.name}</DialogTitle>
             <DialogDescription>
-              Paste a JSON object. Array values fill repeated text keys in slide order;
-              image slots stay unchanged for you to replace manually.
+              Paste a JSON object. Use image URLs or data URLs for image keys.
+              Array values fill repeated keys in slide order.
             </DialogDescription>
           </DialogHeader>
           <Textarea
@@ -354,13 +340,6 @@ export function TemplateGallery({
             aria-label="Template JSON data"
             spellCheck={false}
           />
-          {templateToFill &&
-            getPlaceholderKeys(templateToFill, "image").length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Manual image slots:{" "}
-                {getPlaceholderKeys(templateToFill, "image").join(", ")}
-              </p>
-            )}
           {jsonError && (
             <p className="text-sm text-destructive" role="alert">
               {jsonError}

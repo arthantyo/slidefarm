@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { readSavedImagePrompts, SAVED_IMAGE_PROMPTS_EVENT, SAVED_IMAGE_PROMPTS_KEY } from "@/lib/canvas/saved-image-prompts";
 import {
   Select,
@@ -92,11 +93,21 @@ export function ImageProperties({ element, onUpdate }: ImagePropertiesProps) {
           className="h-8 text-xs"
         />
         <p className="text-[11px] text-muted-foreground">
-          The workflow fills this slot with a subject when an AI base prompt is set.
+          Use a subject when the AI image toggle is on. Otherwise, use an image URL or data URL.
         </p>
       </div>
       <div className="space-y-1.5">
         <Label className="text-xs">AI image base prompt</Label>
+        <div className="flex items-center justify-between gap-3">
+          <Label htmlFor={`image-subject-${element.id}`} className="text-xs">
+            Use placeholder as AI image subject
+          </Label>
+          <Switch
+            id={`image-subject-${element.id}`}
+            checked={element.usePlaceholderAsSubject ?? Boolean(element.aiPlaceholderPrompt?.trim())}
+            onCheckedChange={(checked) => onUpdate({ usePlaceholderAsSubject: checked })}
+          />
+        </div>
         {savedPrompts.length > 0 && (
           <Select value={savedPrompts.includes(element.aiPlaceholderPrompt ?? '') ? element.aiPlaceholderPrompt : undefined} onValueChange={(prompt) => onUpdate({ aiPlaceholderPrompt: prompt })}>
             <SelectTrigger className="h-8 min-w-0 text-xs" aria-label="Choose a saved base prompt" title={element.aiPlaceholderPrompt}>
@@ -118,7 +129,7 @@ export function ImageProperties({ element, onUpdate }: ImagePropertiesProps) {
           className="min-h-24 resize-y text-xs"
         />
         <p className="text-[11px] text-muted-foreground">
-          Set this and a placeholder key to generate an image from the base prompt followed by the subject.
+          When enabled, workflows generate an image from this prompt and the placeholder subject. When disabled, the placeholder value is used as an image URL or data URL.
         </p>
       </div>
     </div>

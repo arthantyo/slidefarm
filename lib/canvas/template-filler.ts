@@ -8,7 +8,7 @@ export type TemplateData = Record<string, string | string[]>;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Walk all slides and collect every unique text placeholder key */
+/** Walk all slides and collect every unique text or image placeholder key */
 export function extractPlaceholderKeys(slides: Slide[]): string[] {
   const keys = new Set<string>();
   for (const slide of slides) {
@@ -21,7 +21,7 @@ export function extractPlaceholderKeys(slides: Slide[]): string[] {
   return Array.from(keys).sort();
 }
 
-/** Replace placeholder text in a single element */
+/** Replace placeholder content in a single element */
 function fillElement(
   el: CanvasElement,
   data: TemplateData,
@@ -32,7 +32,11 @@ function fillElement(
     const text = Array.isArray(value) ? value[occurrenceIndex] : value;
     return text === undefined ? el : { ...el, text };
   }
-  // image placeholders are intentionally left unchanged — user fills manually
+  if (el.type === 'image' && el.placeholder && el.placeholder in data) {
+    const value = data[el.placeholder];
+    const src = Array.isArray(value) ? value[occurrenceIndex] : value;
+    return src === undefined ? el : { ...el, src };
+  }
   return el;
 }
 
@@ -44,7 +48,7 @@ function fillSlides(slides: Slide[], data: TemplateData): Slide[] {
     id: nanoid(10),
     elements: slide.elements.map((el) => {
       const cloned = el.type === 'background' ? { ...el } : { ...el, id: nanoid(10) };
-      if (el.type !== 'text' || !el.placeholder || !Array.isArray(data[el.placeholder])) {
+      if ((el.type !== 'text' && el.type !== 'image') || !el.placeholder || !Array.isArray(data[el.placeholder])) {
         return fillElement(cloned, data, 0);
       }
       const key = el.placeholder;
@@ -73,10 +77,7 @@ export function projectFromTemplate(template: CustomTemplate): Project {
 
 /**
  * Create a new Project from a CustomTemplate (or any project acting as a template)
- * by substituting placeholder text values from `data`.
- *
- * Image elements with a `placeholder` key are left as-is so the user can
- * replace them manually in the editor.
+ * by substituting text and image placeholder values from `data`.
  */
 export function fillTemplateFromData(
   template: Template | Project,

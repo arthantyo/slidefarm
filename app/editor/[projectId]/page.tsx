@@ -6,6 +6,7 @@ import { useEditorStore } from '@/stores/editor-store';
 import { useProjectStore } from '@/stores/project-store';
 import { useCustomTemplateStore } from '@/stores/custom-template-store';
 import { projectFromTemplate } from '@/lib/canvas/template-filler';
+import { pasteImageFile } from '@/lib/canvas/paste-image';
 import { editingTemplateId, saveEditorProject } from '@/lib/canvas/save-editor-project';
 import { EditorTopBar } from '@/components/editor/editor-top-bar';
 import { LeftSidebar } from '@/components/editor/left-sidebar';
@@ -26,6 +27,7 @@ export default function EditorPage() {
   const [isLoading, setIsLoading] = useState(true);
   const hydratedTemplateRef = useRef<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const internalCopyRef = useRef(false);
   const latestProjectRef = useRef(project);
   const latestDirtyRef = useRef(useEditorStore.getState().isDirty);
   latestProjectRef.current = project;
@@ -131,12 +133,7 @@ export default function EditorPage() {
       if (cmd && e.key === 'c' && selectedElementIds.length > 0) {
         e.preventDefault();
         useEditorStore.getState().copySelected();
-        return;
-      }
-      // Paste
-      if (cmd && e.key === 'v') {
-        e.preventDefault();
-        useEditorStore.getState().paste();
+        internalCopyRef.current = true;
         return;
       }
       // Duplicate
@@ -176,6 +173,42 @@ export default function EditorPage() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [selectedElementIds, project, currentSlideId]);
+
+  useEffect(() => {
+    const handlePaste = (event: ClipboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest('input, textarea, [contenteditable="true"]')) return;
+      if (!useEditorStore.getState().project) return;
+
+      if (internalCopyRef.current && useEditorStore.getState().clipboard) {
+        event.preventDefault();
+        useEditorStore.getState().paste();
+        return;
+      }
+
+      const file = Array.from(event.clipboardData?.items ?? [])
+        .find((item) => item.type.startsWith('image/'))?.getAsFile();
+      if (file) {
+        event.preventDefault();
+        void pasteImageFile(file);
+        return;
+      }
+
+      if (useEditorStore.getState().clipboard) {
+        event.preventDefault();
+        useEditorStore.getState().paste();
+      }
+    };
+    const clearInternalCopy = () => { internalCopyRef.current = false; };
+    window.addEventListener('paste', handlePaste);
+    window.addEventListener('copy', clearInternalCopy);
+    window.addEventListener('blur', clearInternalCopy);
+    return () => {
+      window.removeEventListener('paste', handlePaste);
+      window.removeEventListener('copy', clearInternalCopy);
+      window.removeEventListener('blur', clearInternalCopy);
+    };
+  }, []);
 
   if (isLoading || !project) {
     return (

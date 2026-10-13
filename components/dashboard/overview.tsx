@@ -30,7 +30,7 @@ export function DashboardOverview({
       <Cloudscape className="mb-10 rounded-2xl border border-border bg-black p-8">
         <div className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
           <div className="space-y-3">
-            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+            <h1 className="text-3xl font-bold text-white tracking-tight md:text-4xl">
               Create slideshows at scale!
             </h1>
             <p className="max-w-xl text-lg text-white">

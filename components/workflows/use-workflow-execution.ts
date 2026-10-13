@@ -80,11 +80,20 @@ export function useWorkflowExecution(workflowId: string, document: ReturnType<ty
       if (draft.sourceType === 'ai') {
         if (!draft.systemPrompt.trim()) throw new Error('Enter an AI system prompt.');
         if (!keys.length) throw new Error('This template has no placeholders for the AI agent to fill.');
-        const imageSubjectKeys = Array.from(new Set(template.slides.flatMap((slide) => slide.elements.flatMap((element) => element.type === 'image' && element.placeholder && element.aiPlaceholderPrompt?.trim() ? [element.placeholder] : []))));
+        const imageSubjectKeys = Array.from(new Set(template.slides.flatMap((slide) => slide.elements.flatMap((element) => element.type === 'image' && element.placeholder && (element.usePlaceholderAsSubject ?? Boolean(element.aiPlaceholderPrompt?.trim())) ? [element.placeholder] : []))));
         const response = await fetch('/api/ai/workflow-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ systemPrompt: draft.systemPrompt, source, placeholderKeys: keys, imageSubjectKeys }) });
         const result = await response.json() as { data?: Record<string, string | string[]>; error?: string };
         if (!response.ok || !result.data) throw new Error(result.error || 'AI generation failed.');
         data = result.data;
+        const imageSourceKeys = new Set(template.slides.flatMap((slide) => slide.elements.flatMap((element) => element.type === 'image' && element.placeholder && !(element.usePlaceholderAsSubject ?? Boolean(element.aiPlaceholderPrompt?.trim())) ? [element.placeholder] : [])));
+        if (imageSourceKeys.size) {
+          const sourceData = sourceToTemplateData(source);
+          for (const key of Array.from(imageSourceKeys)) {
+            const value = sourceData[key];
+            if (!value || (Array.isArray(value) ? value.some((part) => !part.trim()) : !value.trim())) throw new Error(`Enter an image URL or data URL for ${key} in Input JSON.`);
+            data[key] = value;
+          }
+        }
       }
       if (keys.length && keys.some((key) => !(key in data))) throw new Error(`Missing template values: ${keys.filter((key) => !(key in data)).join(', ')}`);
       setNodeStatus('source', 'complete');
@@ -96,7 +105,8 @@ export function useWorkflowExecution(workflowId: string, document: ReturnType<ty
         for (let elementIndex = 0; elementIndex < template.slides[slideIndex].elements.length; elementIndex++) {
           const original = template.slides[slideIndex].elements[elementIndex];
           const target = project.slides[slideIndex].elements[elementIndex];
-          if (original.type !== 'image' || target.type !== 'image' || !original.placeholder || !original.aiPlaceholderPrompt?.trim()) continue;
+          if (original.type !== 'image' || target.type !== 'image' || !original.placeholder || !(original.usePlaceholderAsSubject ?? Boolean(original.aiPlaceholderPrompt?.trim()))) continue;
+          if (!original.aiPlaceholderPrompt?.trim()) throw new Error(`Set an AI image base prompt for ${original.placeholder}.`);
           const value = data[original.placeholder];
           const index = imageOccurrences.get(original.placeholder) ?? 0;
           imageOccurrences.set(original.placeholder, index + 1);

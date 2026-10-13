@@ -12,6 +12,7 @@ import { GuideLinesOverlay } from './guides/guide-lines-overlay';
 import { CanvasResizeHandles } from './canvas-size/canvas-resize-handles';
 import { DragIndicatorHUD } from './indicators/drag-indicator-hud';
 import { useEditorStore } from '@/stores/editor-store';
+import { pasteImageFile } from '@/lib/canvas/paste-image';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -61,7 +62,9 @@ export function CanvasBoard({
   const selectionEnabledRef = useRef(selectionEnabled);
   selectionEnabledRef.current = selectionEnabled;
   const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
+  const selectionBoxRef = useRef<SelectionBox | null>(null);
   const [contextElementId, setContextElementId] = useState<string | null>(null);
+  const contextPointRef = useRef<{ x: number; y: number } | null>(null);
   const [replacementImageId, setReplacementImageId] = useState<string | null>(null);
   const [remixingImageId, setRemixingImageId] = useState<string | null>(null);
   const [editingElementId, setEditingElementId] = useState<string | null>(null);
@@ -75,6 +78,7 @@ export function CanvasBoard({
 
   useEffect(() => {
     if (!selectionEnabled) {
+      selectionBoxRef.current = null;
       setSelectionBox(null);
       setEditingElementId(null);
       setMultiDragIndicator(null);
@@ -130,6 +134,13 @@ export function CanvasBoard({
   const replacementImage = otherElements.find((element) => element.id === replacementImageId);
 
   const handleObjectContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (boardRef.current) {
+      const rect = boardRef.current.getBoundingClientRect();
+      contextPointRef.current = {
+        x: (event.clientX - rect.left) / zoom,
+        y: (event.clientY - rect.top) / zoom,
+      };
+    }
     const target = event.target instanceof Element
       ? event.target.closest<HTMLElement>('[data-canvas-element-id]')
       : null;
@@ -153,7 +164,6 @@ export function CanvasBoard({
       elementId = lockedElement?.id;
     }
     if (!elementId || !otherElements.some((element) => element.id === elementId)) {
-      event.preventDefault();
       setContextElementId(null);
       return;
     }
@@ -168,6 +178,25 @@ export function CanvasBoard({
     const store = useEditorStore.getState();
     store.selectElement(contextElementId);
     store.copySelected();
+  };
+
+  const pasteFromContextMenu = async () => {
+    try {
+      if (navigator.clipboard?.read) {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const imageType = item.types.find((type) => type.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            await pasteImageFile(new File([blob], 'pasted-image', { type: imageType }), contextPointRef.current ?? undefined);
+            return;
+          }
+        }
+      }
+    } catch {
+      // The browser may deny clipboard reads; internal canvas paste can still work.
+    }
+    useEditorStore.getState().paste();
   };
 
   // ----- Rubber-band drag on canvas background --------------------------------
@@ -187,30 +216,37 @@ export function CanvasBoard({
       const startX = (e.clientX - rect.left) / zoom;
       const startY = (e.clientY - rect.top) / zoom;
 
-      setSelectionBox({ startX, startY, currentX: startX, currentY: startY });
+      selectionBoxRef.current = { startX, startY, currentX: startX, currentY: startY };
+      setSelectionBox(selectionBoxRef.current);
 
       const onPointerMove = (moveEvt: PointerEvent) => {
         if (!selectionEnabledRef.current) return;
         const currentX = (moveEvt.clientX - rect.left) / zoom;
         const currentY = (moveEvt.clientY - rect.top) / zoom;
-        setSelectionBox((prev) => prev ? { ...prev, currentX, currentY } : null);
+        if (selectionBoxRef.current) {
+          selectionBoxRef.current = { ...selectionBoxRef.current, currentX, currentY };
+          setSelectionBox(selectionBoxRef.current);
+        }
       };
 
       const onPointerUp = (upEvt: PointerEvent) => {
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
         if (!selectionEnabledRef.current) {
+          selectionBoxRef.current = null;
           setSelectionBox(null);
           return;
         }
 
-        setSelectionBox((prev) => {
-          if (!prev) return null;
+        const box = selectionBoxRef.current;
+        selectionBoxRef.current = null;
+        setSelectionBox(null);
+        if (!box) return;
 
-          const selLeft = Math.min(prev.startX, prev.currentX);
-          const selTop = Math.min(prev.startY, prev.currentY);
-          const selRight = Math.max(prev.startX, prev.currentX);
-          const selBottom = Math.max(prev.startY, prev.currentY);
+          const selLeft = Math.min(box.startX, box.currentX);
+          const selTop = Math.min(box.startY, box.currentY);
+          const selRight = Math.max(box.startX, box.currentX);
+          const selBottom = Math.max(box.startY, box.currentY);
 
           // Only count as a meaningful drag if box is > 4px
           if (selRight - selLeft > 4 || selBottom - selTop > 4) {
@@ -238,8 +274,6 @@ export function CanvasBoard({
             }
           }
 
-          return null;
-        });
       };
 
       window.addEventListener('pointermove', onPointerMove);
@@ -483,6 +517,7 @@ export function CanvasBoard({
           </>
         )}
         <ContextMenuItem disabled={!contextElement} onSelect={copyContextElement}>Copy</ContextMenuItem>
+        <ContextMenuItem onSelect={() => void pasteFromContextMenu()}>Paste</ContextMenuItem>
         <ContextMenuItem disabled={!contextElement} onSelect={() => contextElementId && useEditorStore.getState().duplicateElement(contextElementId)}>Duplicate</ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem disabled={contextLayerIndex < 0 || contextLayerIndex === otherElements.length - 1} onSelect={() => contextElementId && useEditorStore.getState().bringForward(contextElementId)}>Bring forward</ContextMenuItem>

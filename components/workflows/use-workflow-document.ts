@@ -59,9 +59,17 @@ export function useWorkflowDocument(workflowId: string) {
     if (!next) return;
     const counts = new Map<string, number>();
     for (const slide of next.slides) for (const element of slide.elements) {
-      if (element.type === 'text' && element.placeholder) counts.set(element.placeholder, (counts.get(element.placeholder) ?? 0) + 1);
+      if ((element.type === 'text' || element.type === 'image') && element.placeholder) counts.set(element.placeholder, (counts.get(element.placeholder) ?? 0) + 1);
     }
-    update({ templateId: id, ...(draft?.sourceJson.trim() === '{}' ? { sourceJson: JSON.stringify(Object.fromEntries(Array.from(counts, ([key, count]) => [key, count > 1 ? Array(count).fill('') : ''])), null, 2) } : {}) });
+    const sourceJson = JSON.stringify(
+      Object.fromEntries(Array.from(counts, ([key, count]) => [
+        key,
+        count > 1 ? Array(count).fill('') : '',
+      ])),
+      null,
+      2,
+    );
+    update({ templateId: id, sourceJson });
   };
 
   useEffect(() => {

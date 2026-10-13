@@ -63,10 +63,12 @@ export interface TextElement extends BaseElement {
 
 export interface ImageElement extends BaseElement {
   type: 'image';
-  /** Template placeholder key; in AI mode its value is the image subject. */
+  /** Template placeholder key; JSON values are image sources, while AI mode uses image subjects. */
   placeholder?: string;
   /** Base prompt prepended to the workflow-provided subject. */
   aiPlaceholderPrompt?: string;
+  /** Whether AI workflows append this placeholder's value to the base prompt. */
+  usePlaceholderAsSubject?: boolean;
   src: string;
   imagePrompt?: string;
   objectFit: 'cover' | 'contain' | 'fill';
