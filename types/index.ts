@@ -197,10 +197,11 @@ export interface ProjectFolder {
 export interface Workflow {
   id: string;
   name: string;
-  nodes?: Array<'source' | 'template' | 'project' | 'export' | `export:${string}`>;
-  nodePositions?: Partial<Record<'source' | 'template' | 'project' | 'export' | `export:${string}`, { x: number; y: number }>>;
-  connections?: Array<{ from: 'source' | 'template' | 'project' | 'export' | `export:${string}`; to: 'source' | 'template' | 'project' | 'export' | `export:${string}` }>;
+  nodes?: Array<'source' | 'template' | 'project' | 'export' | 'draft' | 'post' | `export:${string}`>;
+  nodePositions?: Partial<Record<'source' | 'template' | 'project' | 'export' | 'draft' | 'post' | `export:${string}`, { x: number; y: number }>>;
+  connections?: Array<{ from: 'source' | 'template' | 'project' | 'export' | 'draft' | 'post' | `export:${string}`; to: 'source' | 'template' | 'project' | 'export' | 'draft' | 'post' | `export:${string}` }>;
   exportFormats?: Record<string, 'zip' | 'pdf' | 'png' | 'jpg'>;
+  tiktok?: Partial<Record<'draft' | 'post', { openId: string; title: string; description: string; privacyLevel: string; isAigc: boolean; uploadConsent: boolean }>>;
   projectFolderId?: string | null;
   pendingProjectId?: string | null;
   sourceType: 'json' | 'ai';

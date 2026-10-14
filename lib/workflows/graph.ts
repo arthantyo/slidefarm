@@ -1,16 +1,18 @@
 import type { Workflow } from '@/types';
 
-export type NodeType = 'source' | 'template' | 'project' | 'export';
+export type NodeType = 'source' | 'template' | 'project' | 'export' | 'draft' | 'post';
 export type NodeId = NodeType | `export:${string}`;
 export type Connection = { from: NodeId; to: NodeId };
 
 export const nodeType = (id: NodeId): NodeType => id.startsWith('export:') ? 'export' : id as NodeType;
 export const workflowNodes = (workflow: Workflow): NodeId[] => workflow.nodes ?? ['source', 'template', 'export'];
-export const workflowConnections = (workflow: Workflow): Connection[] => {
-  if (workflow.connections) return workflow.connections;
-  const nodes = workflowNodes(workflow);
+export const defaultWorkflowConnections = (nodes: NodeId[]): Connection[] => {
   const chain: NodeId[] = ['source', 'template', 'project', 'export'].filter((id) => nodes.includes(id as NodeId)) as NodeId[];
   return chain.slice(1).map((to, index) => ({ from: chain[index], to }));
+};
+export const workflowConnections = (workflow: Workflow): Connection[] => {
+  if (workflow.connections) return workflow.connections;
+  return defaultWorkflowConnections(workflowNodes(workflow));
 };
 
 export function reachableNodes(workflow: Workflow): Set<NodeId> {
@@ -29,10 +31,10 @@ export function reachableNodes(workflow: Workflow): Set<NodeId> {
 }
 
 export function canConnect(nodes: NodeId[], connections: Connection[], from: NodeId, to: NodeId): boolean {
-  if (from === to || !nodes.includes(from) || !nodes.includes(to) || to === 'source' || nodeType(from) === 'export') return false;
+  if (from === to || !nodes.includes(from) || !nodes.includes(to) || to === 'source' || ['export', 'draft', 'post'].includes(nodeType(from))) return false;
   const valid = (from === 'source' && to === 'template') ||
-    (from === 'template' && (to === 'project' || nodeType(to) === 'export')) ||
-    (from === 'project' && nodeType(to) === 'export');
+    (from === 'template' && (to === 'project' || ['export', 'draft', 'post'].includes(nodeType(to)))) ||
+    (from === 'project' && ['export', 'draft', 'post'].includes(nodeType(to)));
   if (!valid) return false;
   if (connections.some((edge) => edge.from === from && edge.to === to)) return false;
   const next: Connection[] = [...connections, { from, to }];

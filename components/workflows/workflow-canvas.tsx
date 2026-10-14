@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, PointerEvent, SetStateAction } from "react";
 import type { Project, Workflow } from "@/types";
 import { nodeType } from "@/lib/workflows/graph";
@@ -15,6 +15,8 @@ import {
   Minus,
   PanelRightOpen,
   Plus,
+  Send,
+  FileUp,
 } from "lucide-react";
 
 export type { NodeType } from "@/lib/workflows/graph";
@@ -30,6 +32,8 @@ export const defaultPositions: Record<NodeType, { x: number; y: number }> = {
   template: { x: 450, y: 100 },
   project: { x: 840, y: 100 },
   export: { x: 1230, y: 100 },
+  draft: { x: 1230, y: 260 },
+  post: { x: 1230, y: 420 },
 };
 
 const nodeOptions = [
@@ -57,131 +61,18 @@ const nodeOptions = [
     detail: "Save files to Media",
     icon: Download,
   },
+  { type: "draft", label: "TikTok draft", detail: "Send slides to inbox", icon: FileUp },
+  { type: "post", label: "TikTok post", detail: "Publish slides", icon: Send },
 ] as const;
 
 const NODE_WIDTH = 340;
 const NODE_HEIGHT = 112;
-const ROUTE_GAP = 24;
 type Point = { x: number; y: number };
+type AlignmentGuide = { position: number; from: number; to: number };
 
 function curvedPath(start: Point, end: Point): string {
   const bend = Math.max(60, Math.abs(end.x - start.x) / 2);
   return `M ${start.x} ${start.y} C ${start.x + bend} ${start.y}, ${end.x - bend} ${end.y}, ${end.x} ${end.y}`;
-}
-
-function connectionPath(
-  from: NodeId,
-  to: NodeId,
-  nodes: NodeId[],
-  position: (node: NodeId) => Point,
-): string {
-  const source = position(from),
-    target = position(to);
-  const start = { x: source.x + NODE_WIDTH, y: source.y + NODE_HEIGHT / 2 };
-  const end = { x: target.x, y: target.y + NODE_HEIGHT / 2 };
-  const startStub = { x: start.x + ROUTE_GAP, y: start.y };
-  const endStub = { x: end.x - ROUTE_GAP, y: end.y };
-  const obstacles = nodes.map((node) => ({
-    x: position(node).x,
-    y: position(node).y,
-    right: position(node).x + NODE_WIDTH,
-    bottom: position(node).y + NODE_HEIGHT,
-  }));
-  const xs = Array.from(
-    new Set([
-      startStub.x,
-      endStub.x,
-      ...obstacles.flatMap((box) => [box.x - ROUTE_GAP, box.right + ROUTE_GAP]),
-    ]),
-  ).sort((a, b) => a - b);
-  const ys = Array.from(
-    new Set([
-      startStub.y,
-      endStub.y,
-      ...obstacles.flatMap((box) => [
-        box.y - ROUTE_GAP,
-        box.bottom + ROUTE_GAP,
-      ]),
-    ]),
-  ).sort((a, b) => a - b);
-  const clear = (a: Point, b: Point) =>
-    obstacles.every((box) =>
-      a.x === b.x
-        ? a.x <= box.x ||
-          a.x >= box.right ||
-          Math.max(a.y, b.y) <= box.y ||
-          Math.min(a.y, b.y) >= box.bottom
-        : a.y <= box.y ||
-          a.y >= box.bottom ||
-          Math.max(a.x, b.x) <= box.x ||
-          Math.min(a.x, b.x) >= box.right,
-    );
-  const points = xs.flatMap((x) => ys.map((y) => ({ x, y })));
-  const key = (point: Point, direction: string) =>
-    `${point.x},${point.y},${direction}`;
-  const queue = [
-    { point: startStub, direction: "horizontal", cost: 0, route: [startStub] },
-  ];
-  const best = new Map<string, number>();
-  while (queue.length) {
-    queue.sort((a, b) => a.cost - b.cost);
-    const current = queue.shift()!;
-    const state = key(current.point, current.direction);
-    if (current.cost >= (best.get(state) ?? Infinity)) continue;
-    best.set(state, current.cost);
-    if (current.point.x === endStub.x && current.point.y === endStub.y) {
-      const route = current.route.filter(
-        (point, index, all) =>
-          index === 0 ||
-          index === all.length - 1 ||
-          (all[index - 1].x !== point.x && all[index + 1].x === point.x) ||
-          (all[index - 1].y !== point.y && all[index + 1].y === point.y),
-      );
-      let path = `M ${start.x} ${start.y} L ${route[0].x} ${route[0].y}`;
-      for (let index = 1; index < route.length - 1; index++) {
-        const previous = route[index - 1],
-          corner = route[index],
-          next = route[index + 1];
-        const radius = Math.min(
-          12,
-          Math.abs(corner.x - previous.x + corner.y - previous.y) / 2,
-          Math.abs(next.x - corner.x + next.y - corner.y) / 2,
-        );
-        const approach = {
-          x: corner.x + Math.sign(previous.x - corner.x) * radius,
-          y: corner.y + Math.sign(previous.y - corner.y) * radius,
-        };
-        const departure = {
-          x: corner.x + Math.sign(next.x - corner.x) * radius,
-          y: corner.y + Math.sign(next.y - corner.y) * radius,
-        };
-        path += ` L ${approach.x} ${approach.y} Q ${corner.x} ${corner.y} ${departure.x} ${departure.y}`;
-      }
-      return `${path} L ${endStub.x} ${endStub.y} L ${end.x} ${end.y}`;
-    }
-    for (const next of points) {
-      if (
-        (next.x !== current.point.x && next.y !== current.point.y) ||
-        (next.x === current.point.x && next.y === current.point.y) ||
-        !clear(current.point, next)
-      )
-        continue;
-      const direction = next.x === current.point.x ? "vertical" : "horizontal";
-      const cost =
-        current.cost +
-        Math.abs(next.x - current.point.x) +
-        Math.abs(next.y - current.point.y) +
-        (current.direction && current.direction !== direction ? 32 : 0);
-      if (cost < (best.get(key(next, direction)) ?? Infinity))
-        queue.push({
-          point: next,
-          direction,
-          cost,
-          route: [...current.route, next],
-        });
-    }
-  }
-  return curvedPath(start, end);
 }
 
 interface WorkflowCanvasProps {
@@ -225,6 +116,16 @@ export function WorkflowCanvas({
 }: WorkflowCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
+  const routedConnections = useMemo(
+    () => connections.filter(({ from, to }) => nodes.includes(from) && nodes.includes(to)).map(({ from, to }) => ({
+      from, to, path: curvedPath(
+        { x: position(from).x + NODE_WIDTH, y: position(from).y + NODE_HEIGHT / 2 },
+        { x: position(to).x, y: position(to).y + NODE_HEIGHT / 2 },
+      ),
+    })),
+    [connections, nodes, position],
+  );
+  const [guides, setGuides] = useState<{ vertical?: AlignmentGuide; horizontal?: AlignmentGuide }>({});
   const drag = useRef<{
     node: NodeId;
     pointerX: number;
@@ -232,6 +133,8 @@ export function WorkflowCanvas({
     startX: number;
     startY: number;
   } | null>(null);
+  const dragFrame = useRef<number | null>(null);
+  const pendingDragPoint = useRef<Point | null>(null);
   const [connecting, setConnecting] = useState<{
     from: NodeId;
     point: Point;
@@ -269,6 +172,9 @@ export function WorkflowCanvas({
     canvas.addEventListener("wheel", handleWheel, { passive: false });
     return () => canvas.removeEventListener("wheel", handleWheel);
   }, [zoom, zoomAt]);
+  useEffect(() => () => {
+    if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
+  }, []);
   const startDrag = (event: PointerEvent<HTMLDivElement>, node: NodeId) => {
     if (event.button !== 0) return;
     const start = position(node);
@@ -279,16 +185,63 @@ export function WorkflowCanvas({
       startX: start.x,
       startY: start.y,
     };
+    setGuides({});
     event.currentTarget.setPointerCapture(event.pointerId);
   };
-  const moveDrag = (event: PointerEvent<HTMLDivElement>) => {
+  const applyDrag = (clientX: number, clientY: number) => {
     const current = drag.current;
-    if (current)
-      onMoveNode(
-        current.node,
-        Math.round(current.startX + (event.clientX - current.pointerX) / zoom),
-        Math.round(current.startY + (event.clientY - current.pointerY) / zoom),
-      );
+    if (!current) return;
+    const x = current.startX + (clientX - current.pointerX) / zoom;
+    const y = current.startY + (clientY - current.pointerY) / zoom;
+    let vertical: AlignmentGuide | undefined;
+    let horizontal: AlignmentGuide | undefined;
+    let bestX = 8 / zoom;
+    let bestY = 8 / zoom;
+    let snapX = x;
+    let snapY = y;
+    for (const node of nodes) {
+      if (node === current.node) continue;
+      const other = position(node);
+      for (const offset of [0, NODE_WIDTH / 2, NODE_WIDTH]) {
+        const delta = other.x + offset - (x + offset);
+        if (Math.abs(delta) < bestX) {
+          bestX = Math.abs(delta);
+          vertical = { position: other.x + offset, from: Math.min(y, other.y), to: Math.max(y + NODE_HEIGHT, other.y + NODE_HEIGHT) };
+          snapX = x + delta;
+        }
+      }
+      for (const offset of [0, NODE_HEIGHT / 2, NODE_HEIGHT]) {
+        const delta = other.y + offset - (y + offset);
+        if (Math.abs(delta) < bestY) {
+          bestY = Math.abs(delta);
+          horizontal = { position: other.y + offset, from: Math.min(x, other.x), to: Math.max(x + NODE_WIDTH, other.x + NODE_WIDTH) };
+          snapY = y + delta;
+        }
+      }
+    }
+    setGuides({ vertical, horizontal });
+    onMoveNode(current.node, Math.round(snapX), Math.round(snapY));
+  };
+  const moveDrag = (event: PointerEvent<HTMLDivElement>) => {
+    if (!drag.current) return;
+    pendingDragPoint.current = { x: event.clientX, y: event.clientY };
+    if (dragFrame.current !== null) return;
+    dragFrame.current = requestAnimationFrame(() => {
+      dragFrame.current = null;
+      const point = pendingDragPoint.current;
+      pendingDragPoint.current = null;
+      if (point) applyDrag(point.x, point.y);
+    });
+  };
+  const finishDrag = (event?: PointerEvent<HTMLDivElement>) => {
+    if (!drag.current) return;
+    if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
+    dragFrame.current = null;
+    const point = event ? { x: event.clientX, y: event.clientY } : pendingDragPoint.current;
+    pendingDragPoint.current = null;
+    if (point && (point.x !== drag.current.pointerX || point.y !== drag.current.pointerY)) applyDrag(point.x, point.y);
+    drag.current = null;
+    setGuides({});
   };
   const startPan = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 1) return;
@@ -332,6 +285,8 @@ export function WorkflowCanvas({
     template: `${templateName ?? "Choose a template"} · Click to configure`,
     project: "Pauses for slide review · Click to configure",
     export: `${draft.exportFormat.toUpperCase()} to Media · Click to configure`,
+    draft: "Send to TikTok inbox · Click to configure",
+    post: "Publish to TikTok · Click to configure",
   };
 
   return (
@@ -421,23 +376,48 @@ export function WorkflowCanvas({
             transformOrigin: "top left",
           }}
         >
-          <svg
-            className="pointer-events-none absolute left-0 top-0 h-px w-px overflow-visible"
-            aria-hidden="true"
-          >
-            {connections.map(
-              ({ from, to }) =>
-                nodes.includes(from) &&
-                nodes.includes(to) && (
-                  <path
-                    key={`${from}-${to}`}
-                    d={connectionPath(from, to, nodes, position)}
-                    fill="none"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth="3"
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                  />
+          <svg className="pointer-events-none absolute left-0 top-0 h-px w-px overflow-visible">
+            {guides.vertical && (
+              <line x1={guides.vertical.position} x2={guides.vertical.position} y1={guides.vertical.from} y2={guides.vertical.to} stroke="#06b6d4" strokeWidth="2" strokeDasharray="5 4" />
+            )}
+            {guides.horizontal && (
+              <line x1={guides.horizontal.from} x2={guides.horizontal.to} y1={guides.horizontal.position} y2={guides.horizontal.position} stroke="#06b6d4" strokeWidth="2" strokeDasharray="5 4" />
+            )}
+            {routedConnections.map(
+              ({ from, to, path }) => (
+                  <g key={`${from}-${to}`} className="group">
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth="3"
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      className="group-hover:stroke-destructive group-focus-within:stroke-destructive"
+                    />
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke="transparent"
+                      strokeWidth="20"
+                      className="pointer-events-auto cursor-pointer focus:outline-none"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Disconnect ${from} from ${to}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDisconnect(from, to);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onDisconnect(from, to);
+                        }
+                      }}
+                    >
+                      <title>Click to disconnect {from} from {to}</title>
+                    </path>
+                  </g>
                 ),
             )}
             {connecting && (
@@ -490,7 +470,7 @@ export function WorkflowCanvas({
                     }}
                   />
                 )}
-                {type !== "export" && (
+                {!(["export", "draft", "post"] as NodeType[]).includes(type) && (
                   <button
                     type="button"
                     aria-label={`Connect from ${option.label}`}
@@ -536,12 +516,8 @@ export function WorkflowCanvas({
                   className="flex cursor-grab touch-none items-center gap-2 font-semibold active:cursor-grabbing"
                   onPointerDown={(event) => startDrag(event, id)}
                   onPointerMove={moveDrag}
-                  onPointerUp={() => {
-                    drag.current = null;
-                  }}
-                  onLostPointerCapture={() => {
-                    drag.current = null;
-                  }}
+                  onPointerUp={finishDrag}
+                  onLostPointerCapture={() => finishDrag()}
                 >
                   <Grip className="h-4 w-4 text-muted-foreground" />
                   <span

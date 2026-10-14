@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { AlignHorizontalDistributeCenter, ArrowLeft, Loader2, LocateFixed, Play, Save } from "lucide-react";
 import { WorkflowCanvas } from "./workflow-canvas";
 import type { NodeType } from "./workflow-canvas";
+import { nodeType } from "@/lib/workflows/graph";
 import type { NodeId } from "@/lib/workflows/graph";
 import { WorkflowNodeSettings } from "./workflow-node-settings";
 import { WorkflowReviewPanel } from "./workflow-review-panel";
@@ -57,10 +58,12 @@ export function WorkflowBuilder({ workflowId }: { workflowId: string }) {
     if (selectedNode === node) setSelectedNode(null);
   };
   const alignNodes = () => {
-    if (!nodes.length) return;
+    if (nodes.length < 2) return;
     const left = Math.min(...nodes.map((node) => position(node).x));
     const top = Math.min(...nodes.map((node) => position(node).y));
-    const nodePositions = nodes.reduce<Partial<Record<NodeId, { x: number; y: number }>>>(
+    const order: Record<NodeType, number> = { source: 0, template: 1, project: 2, export: 3, draft: 4, post: 5 };
+    const sortedNodes = [...nodes].sort((a, b) => order[nodeType(a)] - order[nodeType(b)]);
+    const nodePositions = sortedNodes.reduce<Partial<Record<NodeId, { x: number; y: number }>>>(
       (positions, node, index) => ({ ...positions, [node]: { x: left + index * 390, y: top } }),
       {},
     );

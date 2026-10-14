@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { fillTemplateFromData } from '@/lib/canvas/template-filler';
 import { exportWorkflowToMedia } from '@/lib/workflows/export-media';
+import { sendWorkflowToTikTok } from '@/lib/workflows/send-tiktok';
 import { useProjectStore } from '@/stores/project-store';
 import { nodeType, reachableNodes, workflowConnections } from '@/lib/workflows/graph';
 import type { NodeId } from '@/lib/workflows/graph';
@@ -13,7 +14,7 @@ export function useWorkflowExecution(workflowId: string, document: ReturnType<ty
   const router = useRouter();
   const resumed = useRef(false);
   const { draft, workflows, nodes, template, keys, folders, reviewProject, setDraft, setReviewProject, setReviewSlideIndex, persist, setBusy, setError, setMessage, setStatuses, setNodeStatus } = document;
-  const exportNodes = (afterReview: boolean): NodeId[] => {
+  const outputNodes = (afterReview: boolean): NodeId[] => {
     if (!draft) return [];
     const edges = workflowConnections(draft);
     const fromProject = new Set<NodeId>(['project']);
@@ -23,13 +24,14 @@ export function useWorkflowExecution(workflowId: string, document: ReturnType<ty
       for (const edge of edges.filter((item) => item.from === id)) if (!fromProject.has(edge.to)) { fromProject.add(edge.to); queue.push(edge.to); }
     }
     const reachable = reachableNodes(draft);
-    return nodes.filter((id) => nodeType(id) === 'export' && reachable.has(id) && fromProject.has(id) === afterReview);
+    return nodes.filter((id) => ['export', 'draft', 'post'].includes(nodeType(id)) && reachable.has(id) && fromProject.has(id) === afterReview);
   };
-  const runExports = async (project: NonNullable<typeof reviewProject>, ids: NodeId[]) => {
+  const runOutputs = async (project: NonNullable<typeof reviewProject>, ids: NodeId[]) => {
     if (!draft) return;
     for (const id of ids) {
       setNodeStatus(id, 'processing');
-      await exportWorkflowToMedia(project, { ...draft, exportFormat: draft.exportFormats?.[id] ?? draft.exportFormat });
+      if (nodeType(id) === 'export') await exportWorkflowToMedia(project, { ...draft, exportFormat: draft.exportFormats?.[id] ?? draft.exportFormat });
+      else if (id === 'draft' || id === 'post') await sendWorkflowToTikTok(project, draft, id);
       setNodeStatus(id, 'complete');
     }
   };
@@ -40,12 +42,12 @@ export function useWorkflowExecution(workflowId: string, document: ReturnType<ty
     try {
       if (!(await useProjectStore.getState().save(reviewProject))) throw new Error('Could not save reviewed project.');
       setNodeStatus('project', 'complete');
-      await runExports(reviewProject, exportNodes(true));
+      await runOutputs(reviewProject, outputNodes(true));
       const saved = { ...draft, pendingProjectId: null, updatedAt: Date.now() };
       await persist(workflows.map((item) => item.id === saved.id ? saved : item));
       setDraft(saved);
       setReviewProject(null);
-      setMessage(exportNodes(true).length ? 'Review complete. Exports saved to Media.' : 'Review complete. Project saved.');
+      setMessage('Review complete. Connected outputs finished.');
     } catch (cause) {
       setStatuses((current) => { const active = (Object.keys(current) as NodeId[]).find((id) => current[id] === 'processing'); return active ? { ...current, [active]: 'error' } : current; });
       setError(cause instanceof Error ? cause.message : 'Could not continue workflow.');
@@ -70,8 +72,13 @@ export function useWorkflowExecution(workflowId: string, document: ReturnType<ty
       const reachable = reachableNodes(draft);
       if (!reachable.has('template') || !workflowConnections(draft).some((edge) => edge.from === 'source' && edge.to === 'template')) throw new Error('Connect Source to Template.');
       const hasReview = reachable.has('project') && workflowConnections(draft).some((edge) => edge.from === 'template' && edge.to === 'project');
-      const immediateExports = exportNodes(false).filter((id) => workflowConnections(draft).some((edge) => edge.from === 'template' && edge.to === id));
-      if (!hasReview && !immediateExports.length) throw new Error('Connect Template to a review queue or export node.');
+      const immediateOutputs = outputNodes(false).filter((id) => workflowConnections(draft).some((edge) => edge.from === 'template' && edge.to === id));
+      if (!hasReview && !immediateOutputs.length) throw new Error('Connect Template to a review queue or output node.');
+      for (const id of [...immediateOutputs, ...outputNodes(true)]) {
+        if ((id === 'draft' || id === 'post') && (!draft.tiktok?.[id]?.openId || !draft.tiktok[id]?.uploadConsent)) {
+          throw new Error(`Configure the TikTok ${id} node and agree to upload its slides.`);
+        }
+      }
       if (!template) throw new Error('Choose a template.');
       if (template.slides.length === 0) throw new Error('The template has no slides.');
       setStatuses({ source: 'processing' });
@@ -110,7 +117,7 @@ export function useWorkflowExecution(workflowId: string, document: ReturnType<ty
         }
       }
       setNodeStatus('template', 'complete');
-      await runExports(project, immediateExports);
+      await runOutputs(project, immediateOutputs);
       if (hasReview) {
         setNodeStatus('project', 'processing');
         if (draft.projectFolderId && !folders.some((folder) => folder.id === draft.projectFolderId)) throw new Error('Choose an existing project folder.');
@@ -132,7 +139,7 @@ export function useWorkflowExecution(workflowId: string, document: ReturnType<ty
         if (workflowId === 'new') router.replace(`/workflows/${saved.id}`);
         return;
       }
-      setMessage('Exports saved to Media.');
+      setMessage('Connected outputs finished.');
     } catch (cause) {
       setStatuses((current) => {
         const active = (Object.keys(current) as NodeId[]).find((node) => current[node] === 'processing');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { nanoid } from 'nanoid';
 import type { Project, Template, Workflow } from '@/types';
@@ -10,7 +10,7 @@ import { useCustomTemplateStore } from '@/stores/custom-template-store';
 import { useProjectStore } from '@/stores/project-store';
 import { defaultPositions } from './workflow-canvas';
 import type { NodeStatus } from './workflow-canvas';
-import { canConnect, nodeType, workflowConnections, workflowNodes } from '@/lib/workflows/graph';
+import { canConnect, defaultWorkflowConnections, nodeType } from '@/lib/workflows/graph';
 import type { NodeId, NodeType } from '@/lib/workflows/graph';
 
 const newWorkflow = (): Workflow => ({
@@ -36,12 +36,15 @@ export function useWorkflowDocument(workflowId: string) {
   const folders = useProjectStore((state) => state.folders);
   const loadProjects = useProjectStore((state) => state.load);
   const projects = useProjectStore((state) => state.projects);
-  const templates: Template[] = [...STARTER_TEMPLATES, ...customTemplates];
-  const template = templates.find((item) => item.id === draft?.templateId);
-  const keys = template ? extractPlaceholderKeys(template.slides) : [];
-  const nodes: NodeId[] = draft ? workflowNodes(draft) : [];
-  const connections = draft ? workflowConnections(draft) : [];
-  const position = (node: NodeId) => draft?.nodePositions?.[node] ?? (nodeType(node) === 'export' && !nodes.includes('project') ? { x: 840, y: 100 } : defaultPositions[nodeType(node)]);
+  const templates: Template[] = useMemo(() => [...STARTER_TEMPLATES, ...customTemplates], [customTemplates]);
+  const template = useMemo(() => templates.find((item) => item.id === draft?.templateId), [templates, draft?.templateId]);
+  const keys = useMemo(() => template ? extractPlaceholderKeys(template.slides) : [], [template]);
+  const nodeIds = draft?.nodes;
+  const connectionData = draft?.connections;
+  const hasDraft = Boolean(draft);
+  const nodes: NodeId[] = useMemo(() => nodeIds ?? (hasDraft ? ['source', 'template', 'export'] : []), [nodeIds, hasDraft]);
+  const connections = useMemo(() => connectionData ?? (hasDraft ? defaultWorkflowConnections(nodes) : []), [connectionData, hasDraft, nodes]);
+  const position = useCallback((node: NodeId) => draft?.nodePositions?.[node] ?? (nodeType(node) === 'export' && !nodes.includes('project') ? { x: 840, y: 100 } : defaultPositions[nodeType(node)]), [draft?.nodePositions, nodes]);
   const update = (change: Partial<Workflow>) => setDraft((current) => current ? { ...current, ...change } : current);
   const addNode = (node: NodeType, at: { x: number; y: number }) => {
     if (!draft || (node !== 'export' && nodes.includes(node))) return;

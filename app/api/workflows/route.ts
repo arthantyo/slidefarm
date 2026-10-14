@@ -5,13 +5,14 @@ import { readWorkflows, writeWorkflows } from '@/lib/server/workflow-files';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const nodeIdSchema = z.union([z.enum(['source', 'template', 'project', 'export']), z.custom<`export:${string}`>((value) => typeof value === 'string' && /^export:.+/.test(value))]);
+const nodeIdSchema = z.union([z.enum(['source', 'template', 'project', 'export', 'draft', 'post']), z.custom<`export:${string}`>((value) => typeof value === 'string' && /^export:.+/.test(value))]);
 const workflowSchema = z.object({
   id: z.string().min(1), name: z.string().min(1),
   nodes: z.array(nodeIdSchema).optional(),
   nodePositions: z.record(z.object({ x: z.number(), y: z.number() })).optional(),
   connections: z.array(z.object({ from: nodeIdSchema, to: nodeIdSchema })).optional(),
   exportFormats: z.record(z.enum(['zip', 'pdf', 'png', 'jpg'])).optional(),
+  tiktok: z.record(z.object({ openId: z.string(), title: z.string(), description: z.string(), privacyLevel: z.string(), isAigc: z.boolean(), uploadConsent: z.boolean() })).optional(),
   projectFolderId: z.string().nullable().optional(),
   pendingProjectId: z.string().nullable().optional(),
   sourceType: z.enum(['json', 'ai']), sourceJson: z.string(),
