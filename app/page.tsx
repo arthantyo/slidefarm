@@ -34,6 +34,7 @@ export default function DashboardPage() {
     duplicate,
     storageError,
     rename: renameProject,
+    setPosted,
     folders,
     createFolder,
     renameFolder,
@@ -245,6 +246,7 @@ export default function DashboardPage() {
               onRemixProject={openRemix}
               onRenameProject={renameProject}
               onMoveProject={moveToFolder}
+              onSetPosted={setPosted}
               onGenerate={() => setGeneratorOpen(true)}
             />
           </TabsContent>

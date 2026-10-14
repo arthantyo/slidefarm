@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { local } from '@/lib/server/tiktok';
-import { cancelScheduledPost, createScheduledPost, listScheduledPosts, scheduleInputSchema, startScheduleRunner, updateScheduledPost } from '@/lib/server/tiktok-schedule';
+import { cancelScheduledPost, createScheduledPost, listScheduledPosts, retryFailedPost, scheduleInputSchema, startScheduleRunner, updateScheduledPost } from '@/lib/server/tiktok-schedule';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,7 +24,16 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   if (!local(req.nextUrl.hostname)) return NextResponse.json({ error: 'Local access only.' }, { status: 403 });
-  const parsed = scheduleInputSchema.extend({ id: z.string().uuid() }).safeParse(await req.json().catch(() => null));
+  const body: unknown = await req.json().catch(() => null);
+  if (body && typeof body === 'object' && 'action' in body && body.action === 'retry') {
+    const retry = z.object({ action: z.literal('retry'), id: z.string().uuid(), calendarDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).safeParse(body);
+    if (!retry.success) return NextResponse.json({ error: 'Invalid retry request.' }, { status: 400 });
+    try {
+      const post = await retryFailedPost(retry.data.id, retry.data.calendarDate);
+      return post ? NextResponse.json({ post }) : NextResponse.json({ error: 'Only failed posts can be retried.' }, { status: 409 });
+    } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Could not retry post.' }, { status: 400 }); }
+  }
+  const parsed = scheduleInputSchema.extend({ id: z.string().uuid() }).safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: 'Invalid scheduled post.' }, { status: 400 });
   const { id, ...input } = parsed.data;
   try {

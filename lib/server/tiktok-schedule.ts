@@ -8,12 +8,14 @@ import type { PhotoPost } from './tiktok-publish';
 import { z } from 'zod';
 
 export const scheduleInputSchema = photoPostSchema.extend({
+  postMode: z.enum(['DIRECT_POST', 'MEDIA_UPLOAD']),
+  postingConsent: z.literal(true),
   projectId: z.string().min(1), projectName: z.string().min(1),
   calendarDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   scheduledAt: z.number().int().positive(),
 });
 export type ScheduleInput = z.infer<typeof scheduleInputSchema>;
-export type ScheduledPostStatus = 'scheduled' | 'submitting' | 'submitted' | 'published' | 'failed' | 'canceled';
+export type ScheduledPostStatus = 'scheduled' | 'submitting' | 'submitted' | 'awaiting_creator' | 'published' | 'failed' | 'canceled';
 export interface ScheduledPost extends ScheduleInput {
   id: string;
   status: ScheduledPostStatus;
@@ -60,8 +62,10 @@ export async function listScheduledPosts(openId?: string): Promise<ScheduledPost
 async function validateInput(input: ScheduleInput) {
   if (input.scheduledAt < Date.now() - 60_000) throw new Error('Choose a future date and time.');
   validatePhotoUrls(input.images);
+  if (input.postMode !== 'MEDIA_UPLOAD' && input.brandContent && input.privacyLevel === 'SELF_ONLY') throw new Error('Branded content cannot be private.');
   const account = (await readAccounts()).find((item) => item.openId === input.openId);
-  if (!account?.scopes.includes('video.publish')) throw new Error('Connect a TikTok account with posting access.');
+  const scope = input.postMode === 'MEDIA_UPLOAD' ? 'video.upload' : 'video.publish';
+  if (!account?.scopes.includes(scope)) throw new Error(`Reconnect the TikTok account and grant ${scope} access.`);
 }
 
 function postDate(post: ScheduledPost) {
@@ -109,6 +113,20 @@ export async function cancelScheduledPost(id: string) {
   });
 }
 
+export async function retryFailedPost(id: string, calendarDate: string) {
+  return exclusive(async () => {
+    const current = await readScheduledPost(id);
+    if (!current || current.status !== 'failed') return null;
+    const scheduledAt = Date.now() + 30_000;
+    const post: ScheduledPost = { ...current, calendarDate, scheduledAt, status: 'scheduled', error: undefined, publishId: undefined, checkedAt: undefined };
+    await validateInput(post);
+    await ensureDailyCapacity(post, id);
+    await writePost(post);
+    startScheduleRunner();
+    return post;
+  });
+}
+
 export function startScheduleRunner() {
   if (runner.__slidefarmTikTokScheduleTimer) return;
   runner.__slidefarmTikTokScheduleTimer = setInterval(() => void tick(), 15_000);
@@ -131,18 +149,28 @@ async function tick() {
     });
     if (due) {
       try {
-        const publishId = await publishPhotoPost(due as PhotoPost);
+        const publishId = await publishPhotoPost(due as PhotoPost, due.postMode);
         await writePost({ ...due, status: 'submitted', publishId, checkedAt: Date.now() });
       } catch (error) {
         await writePost({ ...due, status: 'failed', error: error instanceof Error ? error.message : 'TikTok submission failed.' });
       }
     }
-    const submitted = posts.find((post) => post.status === 'submitted' && post.publishId && (!post.checkedAt || Date.now() - post.checkedAt > 60_000));
+    const submitted = posts.find((post) => (post.status === 'submitted' || post.status === 'awaiting_creator') && post.publishId && (!post.checkedAt || Date.now() - post.checkedAt > 60_000));
     if (submitted?.publishId) {
       try {
         const result = await fetchPhotoPostStatus(submitted.openId, submitted.publishId);
-        await writePost({ ...submitted, checkedAt: Date.now(), status: result.status === 'PUBLISH_COMPLETE' ? 'published' : result.status === 'FAILED' ? 'failed' : 'submitted', error: result.failReason });
-      } catch { await writePost({ ...submitted, checkedAt: Date.now() }); }
+        await exclusive(async () => {
+          const current = await readScheduledPost(submitted.id);
+          if ((current?.status === 'submitted' || current?.status === 'awaiting_creator') && current.publishId === submitted.publishId)
+            await writePost({ ...current, checkedAt: Date.now(), status: result.status === 'PUBLISH_COMPLETE' ? 'published' : result.status === 'FAILED' ? 'failed' : current.postMode === 'MEDIA_UPLOAD' && result.status === 'SEND_TO_USER_INBOX' ? 'awaiting_creator' : 'submitted', error: result.failReason });
+        });
+      } catch {
+        await exclusive(async () => {
+          const current = await readScheduledPost(submitted.id);
+          if ((current?.status === 'submitted' || current?.status === 'awaiting_creator') && current.publishId === submitted.publishId)
+            await writePost({ ...current, checkedAt: Date.now() });
+        });
+      }
     }
   } catch (error) { console.error('TikTok schedule runner failed:', error); }
   finally { ticking = false; }

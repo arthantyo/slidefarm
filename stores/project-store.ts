@@ -19,6 +19,7 @@ interface ProjectStoreState {
   duplicateMany: (projectIds: string[]) => void;
   get: (projectId: string) => Project | undefined;
   rename: (projectId: string, name: string) => void;
+  setPosted: (projectId: string, posted: boolean) => void;
   moveToFolder: (projectId: string, folderId: string | null) => void;
   moveManyToFolder: (projectIds: string[], folderId: string | null) => void;
   createFolder: (name: string) => ProjectFolder | null;
@@ -134,6 +135,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       ...JSON.parse(JSON.stringify(original)),
       id: nanoid(10),
       name: `${original.name} (copy)`,
+      posted: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -149,6 +151,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       ...JSON.parse(JSON.stringify(project)) as Project,
       id: nanoid(10),
       name: `${project.name} (copy)`,
+      posted: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }));
@@ -173,6 +176,16 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     );
     set({ projects: updated });
     void writeLocal(updated, get().folders, (storageError) => set({ storageError }));
+  },
+
+  setPosted: (projectId, posted) => {
+    const { projects, folders } = get();
+    if (!projects.some((project) => project.id === projectId)) return;
+    const updated = projects.map((project) => project.id === projectId
+      ? { ...project, posted, updatedAt: Date.now() }
+      : project);
+    set({ projects: updated });
+    void writeLocal(updated, folders, (storageError) => set({ storageError }));
   },
 
   moveToFolder: (projectId, folderId) => {

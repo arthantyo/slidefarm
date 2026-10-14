@@ -34,7 +34,7 @@ const hmac = (key: Buffer | string, data: string) => createHmac('sha256', key).u
 
 export async function uploadTikTokSlide(key: string, body: Buffer): Promise<string> {
   const settings = config();
-  if (!/^tiktok\/slides\/[a-f0-9-]{36}\.png$/.test(key)) throw new Error('Invalid R2 object key.');
+  if (!/^tiktok\/slides\/[a-f0-9-]{36}\.jpg$/.test(key)) throw new Error('Invalid R2 object key.');
   const endpoint = new URL(settings.endpoint);
   const path = `/${settings.bucket}/${key}`;
   const now = new Date();
@@ -42,7 +42,7 @@ export async function uploadTikTokSlide(key: string, body: Buffer): Promise<stri
   const date = amzDate.slice(0, 8);
   const payloadHash = sha256(body);
   const headers = [
-    `content-type:image/png`,
+    `content-type:image/jpeg`,
     `host:${endpoint.host}`,
     `x-amz-content-sha256:${payloadHash}`,
     `x-amz-date:${amzDate}`,
@@ -56,7 +56,7 @@ export async function uploadTikTokSlide(key: string, body: Buffer): Promise<stri
   const response = await fetch(`${settings.endpoint}${path}`, {
     method: 'PUT',
     headers: {
-      'Content-Type': 'image/png',
+      'Content-Type': 'image/jpeg',
       'x-amz-content-sha256': payloadHash,
       'x-amz-date': amzDate,
       Authorization: `AWS4-HMAC-SHA256 Credential=${settings.accessKeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,

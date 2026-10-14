@@ -47,6 +47,7 @@ interface ProjectCardProps {
   onRename: (name: string) => void;
   folders: ProjectFolder[];
   onMoveToFolder: (folderId: string | null) => void;
+  onSetPosted?: (posted: boolean) => void;
   loading?: boolean;
   layout?: "card" | "list";
   selected?: boolean;
@@ -63,6 +64,7 @@ export function ProjectCard({
   onRename,
   folders,
   onMoveToFolder,
+  onSetPosted,
   loading = false,
   layout = "card",
   selected = false,
@@ -160,6 +162,9 @@ export function ProjectCard({
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onRemix} className="gap-2">
           <Wand2 className="h-4 w-4" /> Remix with AI
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onSetPosted?.(!project.posted)} className="gap-2">
+          <Check className="h-4 w-4" /> {project.posted ? "Mark as not posted" : "Mark as posted"}
         </DropdownMenuItem>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="gap-2">
@@ -290,7 +295,7 @@ export function ProjectCard({
           className="min-w-0 flex-1 py-1 text-left"
           onClick={onOpen}
         >
-          <h3 className="truncate text-sm font-semibold">{project.name}</h3>
+          <h3 className="truncate text-sm font-semibold">{project.name} {project.posted && <span className="text-xs font-normal text-muted-foreground">· Posted</span>}</h3>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {slideCount} slide{slideCount !== 1 ? "s" : ""} · {project.dimensions.width}×{project.dimensions.height} · {lastUpdated}
           </p>
@@ -330,7 +335,7 @@ export function ProjectCard({
       <div className="flex items-start justify-between gap-2 p-3">
         {selectionIndicator}
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold">{project.name}</h3>
+          <h3 className="truncate text-sm font-semibold">{project.name} {project.posted && <span className="text-xs font-normal text-muted-foreground">· Posted</span>}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             {slideCount} slide{slideCount !== 1 ? "s" : ""} · {lastUpdated}
           </p>

@@ -178,6 +178,7 @@ export interface Project {
   id: string;
   name: string;
   folderId?: string | null;
+  posted?: boolean;
   dimensions: ProjectDimensions;
   slides: Slide[];
   theme: Theme;

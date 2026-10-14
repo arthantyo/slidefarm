@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const verifier = desktop ? randomBytes(48).toString('base64url') : undefined;
   const url = new URL('https://www.tiktok.com/v2/auth/authorize/');
   url.searchParams.set('client_key', process.env.TIKTOK_CLIENT_KEY!);
-  url.searchParams.set('scope', 'user.info.basic,video.publish');
+  url.searchParams.set('scope', 'user.info.basic,video.publish,video.upload');
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('redirect_uri', redirectUri);
   url.searchParams.set('state', state);

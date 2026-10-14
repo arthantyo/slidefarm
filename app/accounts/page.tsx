@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Ellipsis, ExternalLink, Trash2 } from "lucide-react";
+import { Ellipsis, ExternalLink, Settings, Trash2 } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -183,6 +183,13 @@ export default function AccountsPage() {
                       >
                         <ExternalLink className="h-4 w-4" />
                         Open account
+                      </Link>
+                      <Link
+                        href={`/accounts/${encodeURIComponent(account.openId)}/settings`}
+                        className="flex items-center gap-2 rounded px-3 py-2 text-sm hover:bg-accent"
+                      >
+                        <Settings className="h-4 w-4" />
+                        Settings
                       </Link>
                       <button
                         type="button"

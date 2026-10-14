@@ -50,6 +50,7 @@ interface ProjectSectionProps {
   onRemixProject: (project: Project) => void;
   onRenameProject: (id: string, name: string) => void;
   onMoveProject: (id: string, folderId: string | null) => void;
+  onSetPosted: (id: string, posted: boolean) => void;
   onGenerate: () => void;
 }
 
@@ -80,6 +81,7 @@ export function ProjectSection({
   onRemixProject,
   onRenameProject,
   onMoveProject,
+  onSetPosted,
   onGenerate,
 }: ProjectSectionProps) {
   return (
@@ -270,6 +272,7 @@ export function ProjectSection({
               onRename={(name) => onRenameProject(project.id, name)}
               folders={folders}
               onMoveToFolder={(folderId) => onMoveProject(project.id, folderId)}
+              onSetPosted={(posted) => onSetPosted(project.id, posted)}
             />
           ))}
         </div>
