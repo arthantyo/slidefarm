@@ -2,18 +2,18 @@
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, Plus, Sparkles, Workflow } from "lucide-react";
+import { LayoutGrid, Plus, Sparkles, Users } from "lucide-react";
 import Cloudscape from "../shaders/cloudscape";
 
 interface DashboardOverviewProps {
-  onStartWorkflow: () => void;
+  onManageAccounts: () => void;
   onGenerate: () => void;
   onCreateBlank: () => void;
   onBrowseTemplates: () => void;
 }
 
 export function DashboardOverview({
-  onStartWorkflow,
+  onManageAccounts,
   onGenerate,
   onCreateBlank,
   onBrowseTemplates,
@@ -22,7 +22,7 @@ export function DashboardOverview({
     { label: "Generate with AI", icon: Sparkles, action: onGenerate },
     { label: "Blank Project", icon: Plus, action: onCreateBlank },
     { label: "Browse Templates", icon: LayoutGrid, action: onBrowseTemplates },
-    { label: "Start Workflow", icon: Workflow, action: onStartWorkflow },
+    { label: "Manage Accounts", icon: Users, action: onManageAccounts },
   ];
 
   return (

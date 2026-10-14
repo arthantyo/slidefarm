@@ -188,7 +188,7 @@ export default function DashboardPage() {
           </div>
         )}
         <DashboardOverview
-          onStartWorkflow={() => router.push("/workflows")}
+          onManageAccounts={() => router.push("/accounts")}
           onGenerate={() => setGeneratorOpen(true)}
           onCreateBlank={handleCreateBlank}
           onBrowseTemplates={() => setActiveTab("templates")}
