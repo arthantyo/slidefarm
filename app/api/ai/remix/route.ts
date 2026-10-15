@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid remix request' }, { status: 400 });
     }
-    const remix = await generateRemix(parsed.data);
+    const remix = await generateRemix(parsed.data, req.headers.get('x-openai-api-key') || undefined);
     return NextResponse.json({ remix });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Remix failed';

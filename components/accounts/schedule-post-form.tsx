@@ -1,5 +1,7 @@
 "use client";
 
+import { aiRequestHeaders } from '@/lib/ai/user-key';
+
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
@@ -403,7 +405,7 @@ export function SchedulePostForm({
     try {
       const response = await fetch("/api/ai/caption", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...aiRequestHeaders() },
         body: JSON.stringify({
           systemPrompt: captionPrompt,
           additionalInstructions,

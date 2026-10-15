@@ -1,5 +1,7 @@
 "use client";
 
+import { aiRequestHeaders } from '@/lib/ai/user-key';
+
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TextElement, TextAlign, FontStyle } from "@/types";
 import { Label } from "@/components/ui/label";
@@ -119,7 +121,7 @@ export function TextProperties({ element, onUpdate }: TextPropertiesProps) {
     try {
       const res = await fetch("/api/ai/rewrite", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...aiRequestHeaders() },
         body: JSON.stringify({ text: element.text, instruction }),
       });
       const data = await res.json();

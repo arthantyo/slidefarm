@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'The original image is required.' }, { status: 400 });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = req.headers.get('x-openai-api-key') || process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: 'OPENAI_API_KEY is not configured.' }, { status: 503 });
   }

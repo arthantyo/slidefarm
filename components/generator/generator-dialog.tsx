@@ -1,5 +1,7 @@
 'use client';
 
+import { aiRequestHeaders } from '@/lib/ai/user-key';
+
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -165,7 +167,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
       } : options;
       const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...aiRequestHeaders() },
         body: JSON.stringify(body),
       });
 

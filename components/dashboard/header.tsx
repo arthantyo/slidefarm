@@ -54,6 +54,9 @@ export function DashboardHeader({
           <Link href="/accounts" className="rounded-md px-2 py-1 text-sm hover:bg-accent">
             Accounts
           </Link>
+          <Link href="/settings" className="rounded-md px-2 py-1 text-sm hover:bg-accent">
+            Settings
+          </Link>
         </nav>
         <button
           onClick={onToggleTheme ?? (() => setTheme(dark ? "light" : "dark"))}

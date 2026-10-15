@@ -111,8 +111,8 @@ function buildUserPrompt(options: GenerationOptions): string {
 async function callOpenAI(
   messages: Array<{ role: string; content: string }>,
   options: GenerationOptions,
+  apiKey = process.env.OPENAI_API_KEY,
 ): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('No OPENAI_API_KEY');
 
   const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -157,7 +157,7 @@ function extractJson(text: string): string {
 
 // ─── OpenAI Provider Implementation ──────────────────────────────────────────
 
-export const openaiProvider: AIProvider = {
+const createOpenAIProvider = (apiKey?: string): AIProvider => ({
   name: 'openai',
 
   generatePlan: async (options) => {
@@ -165,7 +165,7 @@ export const openaiProvider: AIProvider = {
     const content = await callOpenAI([
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
-    ], options);
+    ], options, apiKey);
 
     const jsonStr = extractJson(content);
     const parsed = JSON.parse(jsonStr);
@@ -177,7 +177,7 @@ export const openaiProvider: AIProvider = {
     const content = await callOpenAI([
       { role: 'system', content: 'You are a copy editor. Rewrite the given text according to the instruction. Respond with ONLY the rewritten text, no explanation.' },
       { role: 'user', content: `Instruction: ${instruction}\n\nText: ${text}` },
-    ], { prompt: '' });
+    ], { prompt: '' }, apiKey);
 
     return content.trim().replace(/^["']|["']$/g, '');
   },
@@ -187,11 +187,13 @@ export const openaiProvider: AIProvider = {
     const content = await callOpenAI([
       { role: 'system', content: 'You generate image prompts for AI image generation. The image must NOT contain any text or words. Respond with ONLY the prompt.' },
       { role: 'user', content: `Create an image generation prompt for: ${description}. Style: ${styleHint}. No text in the image.` },
-    ], { prompt: '' });
+    ], { prompt: '' }, apiKey);
 
     return content.trim();
   },
-};
+});
+
+export const openaiProvider = createOpenAIProvider();
 
 // ─── Local/Fallback Provider ─────────────────────────────────────────────────
 // Generates structured content without an API call. Good for demos and offline.
@@ -405,20 +407,20 @@ export const localProvider: AIProvider = {
 
 // ─── Provider Selection ──────────────────────────────────────────────────────
 
-export function getProvider(): AIProvider {
-  if (process.env.OPENAI_API_KEY) {
-    return openaiProvider;
+export function getProvider(apiKey?: string): AIProvider {
+  if (apiKey || process.env.OPENAI_API_KEY) {
+    return apiKey ? createOpenAIProvider(apiKey) : openaiProvider;
   }
   return localProvider;
 }
 
-export async function generatePlan(options: GenerationOptions): Promise<AIPlan> {
-  const provider = getProvider();
+export async function generatePlan(options: GenerationOptions, apiKey?: string): Promise<AIPlan> {
+  const provider = getProvider(apiKey);
   return provider.generatePlan(options);
 }
 
-export async function rewriteText(text: string, instruction: string): Promise<string> {
-  const provider = getProvider();
+export async function rewriteText(text: string, instruction: string, apiKey?: string): Promise<string> {
+  const provider = getProvider(apiKey);
   return provider.rewriteText(text, instruction);
 }
 

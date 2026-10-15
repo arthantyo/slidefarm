@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   }
   const parsed = payloadSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Invalid agent input' }, { status: 400 });
-  const key = process.env.OPENAI_API_KEY;
+  const key = req.headers.get('x-openai-api-key') || process.env.OPENAI_API_KEY;
   if (!key) return NextResponse.json({ error: 'OPENAI_API_KEY is not configured' }, { status: 500 });
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {

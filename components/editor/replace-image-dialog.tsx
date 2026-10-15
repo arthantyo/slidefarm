@@ -1,5 +1,7 @@
 'use client';
 
+import { aiRequestHeaders } from '@/lib/ai/user-key';
+
 import { useState } from 'react';
 import type { ImageElement } from '@/types';
 import { useEditorStore } from '@/stores/editor-store';
@@ -42,6 +44,7 @@ export function ReplaceImageDialog({ element, slideId, onClose, onRemixPendingCh
       body.append('image', sourceImage, `source-image.${extension}`);
       const response = await fetch('/api/ai/image', {
         method: 'POST',
+        headers: aiRequestHeaders(),
         body,
       });
       const result = await response.json() as { src?: string; error?: string };

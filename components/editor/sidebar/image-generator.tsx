@@ -1,5 +1,7 @@
 'use client';
 
+import { aiRequestHeaders } from '@/lib/ai/user-key';
+
 import { useEffect, useState } from 'react';
 import { Loader2, BookmarkPlus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -62,7 +64,7 @@ export function ImageGenerator({ width, height, onAdd }: ImageGeneratorProps) {
     try {
       const response = await fetch('/api/ai/image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...aiRequestHeaders() },
         body: JSON.stringify({ prompt: value, width, height }),
       });
       const result = await response.json() as { src?: string; error?: string };

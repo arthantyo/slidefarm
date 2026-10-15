@@ -49,8 +49,8 @@ function hasMatchingShape(result: RemixResult, request: RemixRequest): boolean {
     );
 }
 
-export async function generateRemix(request: RemixRequest): Promise<RemixResult> {
-  const apiKey = process.env.OPENAI_API_KEY;
+export async function generateRemix(request: RemixRequest, userApiKey?: string): Promise<RemixResult> {
+  const apiKey = userApiKey || process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('AI remix requires an OPENAI_API_KEY');
 
   const source = request.source.slides.map((slide, index) => ({

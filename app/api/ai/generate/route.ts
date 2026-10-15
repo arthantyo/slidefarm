@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'A valid prompt is required (min 3 characters)' }, { status: 400 });
     }
 
-    const plan = await generatePlan(body);
+    const plan = await generatePlan(body, req.headers.get('x-openai-api-key') || undefined);
     return NextResponse.json({ plan });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

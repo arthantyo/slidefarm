@@ -1,5 +1,5 @@
 {
-  "name": "nextjs",
+  "name": "slidefarm",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "desktop": "electron .",
+    "desktop:build": "npm run build && electron-builder"
   },
   "dependencies": {
     "@fontsource/open-runde": "^5.3.0",
@@ -78,5 +80,46 @@
     "vaul": "^0.9.9",
     "zod": "^3.23.8",
     "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "electron": "^44.7.2",
+    "electron-builder": "^26.15.3"
+  },
+  "productName": "SlideFarm",
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "com.slidefarm.desktop",
+    "productName": "SlideFarm",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/main.cjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".next/standalone",
+        "to": "server"
+      },
+      {
+        "from": ".next/static",
+        "to": "server/.next/static"
+      },
+      {
+        "from": "public",
+        "to": "server/public"
+      }
+    ],
+    "asar": true,
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   }
 }

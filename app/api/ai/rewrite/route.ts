@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Text and instruction are required' }, { status: 400 });
     }
 
-    const result = await rewriteText(text, instruction);
+    const result = await rewriteText(text, instruction, req.headers.get('x-openai-api-key') || undefined);
     return NextResponse.json({ text: result });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

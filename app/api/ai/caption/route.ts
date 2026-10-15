@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
   const parsed = payloadSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Choose a project and enter a system prompt.' }, { status: 400 });
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = req.headers.get('x-openai-api-key') || process.env.OPENAI_API_KEY;
   if (!apiKey) return NextResponse.json({ error: 'OPENAI_API_KEY is not configured.' }, { status: 503 });
 
   try {
