@@ -24,6 +24,7 @@ const requestSchema = z.object({
         kind: z.string(),
         description: z.string().optional(),
       })),
+      images: z.array(z.object({ name: z.string(), description: z.string().optional(), x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() })),
     })).min(1).max(30),
   }),
   instruction: z.string().trim().min(3).max(2000),

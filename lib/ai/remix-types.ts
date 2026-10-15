@@ -16,6 +16,7 @@ export interface RemixSource {
       placeholder?: string;
     }[];
     visuals: { name: string; kind: string; description?: string }[];
+    images: { name: string; description?: string; x: number; y: number; width: number; height: number }[];
   }[];
 }
 
@@ -32,5 +33,5 @@ export interface RemixRequest {
 export interface RemixResult {
   title: string;
   understanding: { mainMessage: string; keyPoints: string[] };
-  slides: { texts: string[] }[];
+  slides: { texts: string[]; imagePrompts: string[] }[];
 }

@@ -3,6 +3,7 @@ import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Template, Workflow } from '@/types';
 import { dataDirectory } from './project-files';
+import { effectiveImageModel } from './image-model-settings';
 import { extractPlaceholderKeys } from '@/lib/canvas/template-filler';
 import { parseSourceJson, sourceToTemplateData } from '@/lib/workflows/data';
 
@@ -10,6 +11,7 @@ export interface WorkflowJob {
   id: string;
   workflow: Workflow;
   template: Template;
+  imageModel?: string;
   status: 'queued' | 'running' | 'ready' | 'complete' | 'failed';
   data?: Record<string, string | string[]>;
   images?: Record<string, string>;
@@ -37,7 +39,7 @@ async function writeJob(job: WorkflowJob) {
 
 export async function enqueueWorkflow(workflow: Workflow, template: Template) {
   const now = Date.now();
-  const job: WorkflowJob = { id: randomUUID(), workflow, template, status: 'queued', createdAt: now, updatedAt: now };
+  const job: WorkflowJob = { id: randomUUID(), workflow, template, imageModel: await effectiveImageModel(), status: 'queued', createdAt: now, updatedAt: now };
   await writeJob(job);
   void drain();
   return job;
@@ -131,7 +133,7 @@ async function generate(job: WorkflowJob) {
       const prompt = `${element.aiPlaceholderPrompt.trim()} ${subject}`;
       const ratio = element.width / element.height;
       const result = await openAI('images/generations', {
-        model: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1-mini', prompt: `${prompt}\nCreate an image without text, letters, or watermarks.`,
+        model: job.imageModel || await effectiveImageModel(), prompt: `${prompt}\nCreate an image without text, letters, or watermarks.`,
         size: ratio > 1.2 ? '1536x1024' : ratio < 0.8 ? '1024x1536' : '1024x1024', quality: 'medium', background: 'auto', output_format: 'webp', n: 1,
       });
       if (!result.data?.[0]?.b64_json) throw new Error(`Could not generate image for ${element.placeholder}.`);

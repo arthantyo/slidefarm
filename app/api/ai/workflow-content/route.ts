@@ -5,6 +5,7 @@ export const runtime = 'nodejs';
 
 const payloadSchema = z.object({
   systemPrompt: z.string().trim().min(3).max(10000),
+  model: z.string().trim().min(1).max(100).optional(),
   source: z.record(z.unknown()),
   placeholderKeys: z.array(z.string().min(1)).min(1).max(100),
   imageSubjectKeys: z.array(z.string()).default([]),
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        model: parsed.data.model || process.env.OPENAI_MODEL || 'gpt-4o-mini',
         temperature: 0.7,
         response_format: { type: 'json_object' },
         messages: [

@@ -5,7 +5,7 @@ import type { RemixRequest, RemixResult } from './remix-types';
 const remixResultSchema = z.object({
   title: z.string().min(1),
   understanding: z.object({ mainMessage: z.string(), keyPoints: z.array(z.string()) }),
-  slides: z.array(z.object({ texts: z.array(z.string()) })),
+  slides: z.array(z.object({ texts: z.array(z.string()), imagePrompts: z.array(z.string()) })),
 });
 
 const responseFormat = {
@@ -33,8 +33,8 @@ const responseFormat = {
           items: {
             type: 'object',
             additionalProperties: false,
-            required: ['texts'],
-            properties: { texts: { type: 'array', items: { type: 'string' } } },
+            required: ['texts', 'imagePrompts'],
+            properties: { texts: { type: 'array', items: { type: 'string' } }, imagePrompts: { type: 'array', items: { type: 'string' } } },
           },
         },
       },
@@ -42,11 +42,30 @@ const responseFormat = {
   },
 } as const;
 
-function hasMatchingShape(result: RemixResult, request: RemixRequest): boolean {
-  return result.slides.length === request.source.slides.length &&
-    result.slides.every((slide, index) =>
-      slide.texts.length === request.source.slides[index].texts.length,
-    );
+function normalizeResult(result: RemixResult, request: RemixRequest): RemixResult | null {
+  if (result.slides.length !== request.source.slides.length) return null;
+  if (result.slides.some((slide, index) => slide.texts.length < request.source.slides[index].texts.length)) return null;
+  return {
+    ...result,
+    slides: result.slides.map((slide, index) => {
+      const source = request.source.slides[index];
+      const texts = slide.texts.slice(0, source.texts.length);
+      const instruction = request.instruction.toLowerCase();
+      const preserveTopImage = /\b(top|uppermost|header)\b/.test(instruction) &&
+        /\b(image|picture|photo|logo)\b/.test(instruction) &&
+        /\b(keep|preserve|unchanged|shouldn'?t|shouldnt|don'?t|dont|do not|leave)\b/.test(instruction);
+      const topImageIndex = source.images.reduce((top, image, imageIndex) =>
+        top < 0 || image.y < source.images[top].y ? imageIndex : top, -1);
+      const imagePrompts = source.images.map((image, imageIndex) => {
+        if (preserveTopImage && imageIndex === topImageIndex) return '';
+        const proposed = slide.imagePrompts[imageIndex]?.trim();
+        if (proposed === '') return '';
+        if (proposed && proposed.length >= 3) return proposed.slice(0, 1900);
+        return `Create an image suited to ${request.instruction}. Slide ${index + 1} says: ${texts.join(' ').slice(0, 600)}. Image role: ${image.name}. ${image.description ?? ''}`.slice(0, 1900);
+      });
+      return { texts, imagePrompts };
+    }),
+  };
 }
 
 export async function generateRemix(request: RemixRequest, userApiKey?: string): Promise<RemixResult> {
@@ -58,6 +77,7 @@ export async function generateRemix(request: RemixRequest, userApiKey?: string):
     type: slide.type,
     notes: slide.notes,
     visuals: slide.visuals,
+    images: slide.images,
     textBoxes: slide.texts.map((item, textIndex) => ({
       box: textIndex + 1,
       role: item.name,
@@ -79,12 +99,13 @@ export async function generateRemix(request: RemixRequest, userApiKey?: string):
   const messages = [
     {
       role: 'system',
-      content: `You rewrite an existing slideshow to satisfy the user's specific change request. First identify the source post's main message and key points in the understanding field. Read all slides together before rewriting; infer each text box's role from its content, position, size, slide notes, and nearby visual descriptions. The box name alone may be generic or misleading. Then return one rewritten string for every supplied text box, in exactly the same slide and box order. Preserve the slide count, sequence, story arc, and the purpose of each box. Make the copy concrete and specific to the source and request; avoid generic filler, invented facts, fabricated quotes, and repeated ideas. Keep each replacement close to the current text's length so it fits the unchanged design. Preserve meaningful claims unless the user explicitly asks to change them. If a box is a label or recurring brand phrase, keep its role. Return a concise title for the remixed slideshow.`,
+      content: `You remix an existing slideshow to satisfy the user's specific change request. The user's instruction controls which images change. For every image, return a detailed generation prompt if it should change, or an empty string if the user asks to keep that image unchanged. Use the supplied image positions to identify references such as "the top image"; do not automatically preserve any image. First identify the source post's main message and key points in the understanding field. Read all slides together before rewriting; infer each text box's role from its content, position, size, slide notes, and nearby visual descriptions. Return one rewritten string for every supplied text box and one image prompt or empty string for every supplied image, in exactly the same slide and element order. New image prompts must depict the remixed topic and fit that slide's new copy, while retaining an appropriate visual style from the source description when available. Do not request text, letters, or watermarks in images. Preserve the slide count, sequence, story arc, and purpose of each box. Make copy concrete and specific; avoid generic filler, invented facts, fabricated quotes, and repeated ideas. Keep each replacement close to the current text's length so it fits the unchanged design. Preserve meaningful claims unless the user explicitly asks to change them. If a box is a label or recurring brand phrase, keep its role. Return a concise title.`,
     },
     { role: 'user', content: userPrompt },
   ];
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  let mismatch = '';
+  for (let attempt = 0; attempt < 3; attempt++) {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -106,11 +127,17 @@ export async function generateRemix(request: RemixRequest, userApiKey?: string):
     const content = data.choices?.[0]?.message?.content;
     if (typeof content !== 'string') throw new Error('The AI returned no remix content');
     const parsed = remixResultSchema.safeParse(JSON.parse(content));
-    if (parsed.success && hasMatchingShape(parsed.data, request)) return parsed.data;
+    if (parsed.success) {
+      const normalized = normalizeResult(parsed.data, request);
+      if (normalized) return normalized;
+      mismatch = parsed.data.slides.length !== request.source.slides.length
+        ? `Expected ${request.source.slides.length} slides; received ${parsed.data.slides.length}.`
+        : `Missing text on slide ${parsed.data.slides.findIndex((slide, index) => slide.texts.length < request.source.slides[index].texts.length) + 1}.`;
+    } else mismatch = 'The response did not contain the required remix fields.';
     messages.push({
       role: 'user',
-      content: `The previous response had the wrong number of slides or text boxes. Return exactly ${request.source.slides.length} slides with these text box counts: ${request.source.slides.map((slide) => slide.texts.length).join(', ')}.`,
+      content: `${mismatch} Return exactly ${request.source.slides.length} slides. Required text box counts by slide: ${request.source.slides.map((slide) => slide.texts.length).join(', ')}. Required image prompt counts by slide: ${request.source.slides.map((slide) => slide.images.length).join(', ')}. Include both texts and imagePrompts arrays on every slide, including empty arrays where needed.`,
     });
   }
-  throw new Error('The AI could not match the existing slide text boxes. Please try again.');
+  throw new Error(`The AI could not match the slideshow layout. ${mismatch}`);
 }

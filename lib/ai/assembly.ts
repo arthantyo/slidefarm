@@ -11,7 +11,7 @@ export function isRemixableTextElement(element: TextElement): boolean {
 }
 
 /** Apply copy by text box position while preserving every source slide element. */
-export function assembleRemixedProject(remix: RemixResult, source: Project): Project {
+export function assembleRemixedProject(remix: RemixResult, source: Project, imageSources: string[][]): Project {
   if (remix.slides.length !== source.slides.length) {
     throw new Error('Remix slide count does not match the original project');
   }
@@ -20,16 +20,28 @@ export function assembleRemixedProject(remix: RemixResult, source: Project): Pro
       (element): element is TextElement => element.type === 'text' && isRemixableTextElement(element),
     );
     const replacements = remix.slides[index].texts;
+    const imagePrompts = remix.slides[index].imagePrompts;
+    const images = slide.elements.filter((element) => element.type === 'image');
     if (replacements.length !== textBoxes.length) {
       throw new Error(`Remix text count does not match slide ${index + 1}`);
     }
+    if (imagePrompts.length !== images.length || imageSources[index]?.length !== images.length) {
+      throw new Error(`Remix image count does not match slide ${index + 1}`);
+    }
     let textIndex = 0;
+    let imageIndex = 0;
 
     return {
       ...slide,
       id: nanoid(10),
       elements: slide.elements.map((element) => {
         const id = nanoid(10);
+        if (element.type === 'image') {
+          const position = imageIndex++;
+          return imagePrompts[position]
+            ? { ...element, id, src: imageSources[index][position], imagePrompt: imagePrompts[position] }
+            : { ...element, id };
+        }
         if (element.type !== 'text' || !isRemixableTextElement(element)) return { ...element, id };
         return { ...element, id, text: replacements[textIndex++] };
       }),

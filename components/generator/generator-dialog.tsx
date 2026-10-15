@@ -22,15 +22,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
 import { Sparkles, ChevronDown, Loader2, Wand2 } from 'lucide-react';
-import { PLATFORM_PRESETS } from '@/types';
-import type { GenerationOptions, AspectRatioKey, Tone, ContentDensity, VisualStyle, Project, TextElement } from '@/types';
+import type { Tone, ContentDensity, Project, TextElement } from '@/types';
 import { useEditorStore } from '@/stores/editor-store';
 import { useProjectStore } from '@/stores/project-store';
-import { assembleProject, assembleRemixedProject, isRemixableTextElement } from '@/lib/ai/assembly';
-import type { RemixResult } from '@/lib/ai/remix-types';
+import { isRemixableTextElement } from '@/lib/ai/assembly';
+import { fillTemplateFromData } from '@/lib/canvas/template-filler';
+import { useCustomTemplateStore } from '@/stores/custom-template-store';
 
 interface GeneratorDialogProps {
   open: boolean;
@@ -54,18 +52,6 @@ const DENSITY_OPTIONS: { value: ContentDensity; label: string }[] = [
   { value: 'detailed', label: 'Detailed' },
 ];
 
-const STYLE_OPTIONS: { value: VisualStyle; label: string }[] = [
-  { value: 'minimalist-vector', label: 'Minimalist Vector' },
-  { value: 'monochrome-silhouette', label: 'Monochrome Silhouette' },
-  { value: 'flat-illustration', label: 'Flat Illustration' },
-  { value: 'editorial-illustration', label: 'Editorial Illustration' },
-  { value: 'photorealistic', label: 'Photorealistic' },
-  { value: '3d', label: '3D Render' },
-  { value: 'watercolor', label: 'Watercolor' },
-  { value: 'cartoon', label: 'Cartoon' },
-  { value: 'abstract', label: 'Abstract' },
-];
-
 export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendingChange }: GeneratorDialogProps) {
   const router = useRouter();
   const loadProject = useEditorStore((s) => s.loadProject);
@@ -73,15 +59,14 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
   const setGenerationProgress = useEditorStore((s) => s.setGenerationProgress);
 
   const [prompt, setPrompt] = useState('');
+  const templates = useCustomTemplateStore((state) => state.templates);
+  const loadTemplates = useCustomTemplateStore((state) => state.load);
+  const [templateId, setTemplateId] = useState('');
   const [model, setModel] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [autoSlideCount, setAutoSlideCount] = useState(true);
-  const [slideCount, setSlideCount] = useState(6);
-  const [platform, setPlatform] = useState('instagram-carousel');
   const [tone, setTone] = useState<Tone>('educational');
   const [density, setDensity] = useState<ContentDensity>('balanced');
   const [language, setLanguage] = useState('English');
-  const [visualStyle, setVisualStyle] = useState<VisualStyle>('flat-illustration');
   const [customInstructions, setCustomInstructions] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,19 +74,28 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
 
   useEffect(() => {
     if (!open) return;
+    if (!remixProject) void loadTemplates();
     if (preserveFormOnOpen.current) {
       preserveFormOnOpen.current = false;
       return;
     }
     setPrompt('');
-    setAutoSlideCount(!remixProject);
-    setSlideCount(remixProject?.slides.length ?? 6);
     setError(null);
-  }, [open, remixProject]);
+  }, [open, remixProject, loadTemplates]);
 
   const handleGenerate = async () => {
     if (prompt.trim().length < 3) {
       setError('Please enter a longer prompt');
+      return;
+    }
+    const template = templates.find((item) => item.id === templateId);
+    if (!remixProject && !template) {
+      setError('Choose a template before generating.');
+      return;
+    }
+    const textElements = template?.slides.flatMap((slide) => slide.elements.filter((element): element is TextElement => element.type === 'text' && Boolean(element.placeholder))) ?? [];
+    if (!remixProject && !textElements.length) {
+      setError('Choose a template with text placeholders.');
       return;
     }
 
@@ -117,21 +111,8 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
     }
 
     try {
-      const preset = PLATFORM_PRESETS.find((p) => p.key === platform) ?? PLATFORM_PRESETS[3];
       setGenerationProgress({ stage: 'Generating slide content', current: 2, total: 6 });
-      const endpoint = remixProject ? '/api/ai/remix' : '/api/ai/generate';
-      const options: GenerationOptions = {
-        prompt: prompt.trim(),
-        model: model.trim() || undefined,
-        slideCount: autoSlideCount ? 'auto' : slideCount,
-        platform,
-        aspectRatio: preset.aspectRatio,
-        tone,
-        contentDensity: density,
-        language,
-        visualStyle,
-        customInstructions: customInstructions.trim() || undefined,
-      };
+      const endpoint = remixProject ? '/api/remix-jobs' : '/api/ai/workflow-content';
       const body = remixProject ? {
         source: {
           name: remixProject.name,
@@ -159,6 +140,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
               }
               return [];
             }),
+            images: slide.elements.flatMap((element) => element.type === 'image' ? [{ name: element.name, description: element.imagePrompt, x: element.x, y: element.y, width: element.width, height: element.height }] : []),
           })),
         },
         instruction: prompt.trim(),
@@ -167,11 +149,16 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
         density,
         language,
         customInstructions: customInstructions.trim() || undefined,
-      } : options;
+      } : {
+        systemPrompt: `Create engaging slideshow copy for this topic: ${prompt.trim()}. Tone: ${tone}. Content density: ${density}. Language: ${language}. ${customInstructions.trim()} Preserve the role of each template text placeholder and keep text concise enough to fit its existing box. For repeated placeholders, return an array with one distinct value per occurrence. Placeholder counts: ${JSON.stringify(Object.fromEntries(Array.from(new Set(textElements.map((element) => element.placeholder!)), (key) => [key, textElements.filter((element) => element.placeholder === key).length])))}.`,
+        source: { topic: prompt.trim() },
+        placeholderKeys: Array.from(new Set(textElements.map((element) => element.placeholder!))),
+        model: model.trim() || undefined,
+      };
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...aiRequestHeaders() },
-        body: JSON.stringify(body),
+        body: JSON.stringify(remixProject ? { sourceProjectId: remixProject.id, request: body } : body),
       });
 
       if (!res.ok) {
@@ -180,6 +167,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
       }
 
       const result = await res.json();
+      if (remixProject) return;
 
       setGenerationProgress({ stage: 'Designing layouts', current: 3, total: 6 });
 
@@ -187,9 +175,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
 
       setGenerationProgress({ stage: 'Assembling slides', current: 4, total: 6 });
 
-      const project = remixProject
-        ? assembleRemixedProject(result.remix as RemixResult, remixProject)
-        : assembleProject(result.plan, preset.width, preset.height);
+      const project = fillTemplateFromData(template!, result.data, prompt.trim().slice(0, 100));
 
       setGenerationProgress({ stage: 'Preparing editor', current: 5, total: 6 });
 
@@ -200,7 +186,6 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
 
       setGenerationProgress({ stage: 'Done', current: 6, total: 6 });
 
-      if (remixing) onRemixPendingChange?.(false);
       onOpenChange(false);
       router.push(`/editor/${project.id}`);
     } catch (err) {
@@ -253,10 +238,16 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
             />
             <p className="text-xs text-muted-foreground">
               {remixProject
-                ? 'Say what audience, angle, or message you want to change. The existing slide design stays in place.'
+                ? 'Say what audience, angle, or message to change. You can also say “keep the top image on every slide unchanged.”'
                 : 'Tip: Include the number of slides, topic, and style for best results.'}
             </p>
           </div>
+
+          {!remixProject && <div className="space-y-2">
+            <Label htmlFor="generation-template">Template</Label>
+            <Select value={templateId} onValueChange={setTemplateId}><SelectTrigger id="generation-template"><SelectValue placeholder="Choose a template" /></SelectTrigger><SelectContent>{templates.filter((template) => template.slides.some((slide) => slide.elements.some((element) => element.type === 'text' && element.placeholder))).map((template) => <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>)}</SelectContent></Select>
+            {!templates.length && <p className="text-xs text-muted-foreground">Create a template with text placeholders first.</p>}
+          </div>}
 
           <div className="space-y-2">
             <Label htmlFor="generation-model">Model</Label>
@@ -290,46 +281,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
 
           {showAdvanced && (
             <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
-              {/* Platform and slide count apply only to new decks. */}
-              {!remixProject && <div className="space-y-2">
-                <Label>Platform</Label>
-                <Select value={platform} onValueChange={setPlatform}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PLATFORM_PRESETS.map((p) => (
-                      <SelectItem key={p.key} value={p.key}>
-                        {p.label} ({p.width}×{p.height})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>}
-
-              {/* Slide count */}
-              {!remixProject && <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Slide Count</Label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Auto</span>
-                    <Switch checked={autoSlideCount} onCheckedChange={setAutoSlideCount} />
-                  </div>
-                </div>
-                {!autoSlideCount && (
-                  <div className="flex items-center gap-3">
-                    <Slider
-                      value={[slideCount]}
-                      onValueChange={(v) => setSlideCount(v[0])}
-                      min={2}
-                      max={20}
-                      step={1}
-                      className="flex-1"
-                    />
-                    <span className="w-8 text-center text-sm font-medium">{slideCount}</span>
-                  </div>
-                )}
-              </div>}
+              {!remixProject && <p className="text-xs text-muted-foreground">Slide count and dimensions come from the chosen template.</p>}
 
               {/* Tone + Density */}
               <div className="grid grid-cols-2 gap-3">
@@ -365,23 +317,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
                 </div>
               </div>
 
-              {/* Visual style changes only new decks; remix keeps the existing design. */}
-              <div className={remixProject ? 'space-y-2' : 'grid grid-cols-2 gap-3'}>
-                {!remixProject && <div className="space-y-2">
-                  <Label>Visual Style</Label>
-                  <Select value={visualStyle} onValueChange={(v) => setVisualStyle(v as VisualStyle)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STYLE_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>}
+              <div className="space-y-2">
                 <div className="space-y-2">
                   <Label>Language</Label>
                   <Input
@@ -417,7 +353,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isGenerating}>
               Cancel
             </Button>
-            <Button onClick={handleGenerate} disabled={isGenerating || prompt.trim().length < 3} className="gap-2">
+            <Button onClick={handleGenerate} disabled={isGenerating || prompt.trim().length < 3 || (!remixProject && !templateId)} className="gap-2">
               {isGenerating ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />

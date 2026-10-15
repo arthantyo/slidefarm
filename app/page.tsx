@@ -52,6 +52,7 @@ export default function DashboardPage() {
   const [generatorOpen, setGeneratorOpen] = useState(false);
   const [remixProject, setRemixProject] = useState<Project | null>(null);
   const [remixingSource, setRemixingSource] = useState<Project | null>(null);
+  const [remixJobError, setRemixJobError] = useState('');
   const remixingRef = useRef(false);
   const [activeTab, setActiveTab] = useState("projects");
   const [selectedFolderId, setSelectedFolderId] = useState("all");
@@ -73,6 +74,40 @@ export default function DashboardPage() {
   useEffect(() => {
     loadCustomTemplates();
   }, [loadCustomTemplates]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    let active = true;
+    let polling = false;
+    const poll = async () => {
+      if (polling) return;
+      polling = true;
+      try {
+        const response = await fetch('/api/remix-jobs', { cache: 'no-store' });
+        if (!response.ok) throw new Error('Could not load remix jobs.');
+        const { jobs } = await response.json() as { jobs: { id: string; sourceProjectId: string; status: string; project?: Project; error?: string }[] };
+        if (!active) return;
+        for (const job of jobs) {
+          if (job.status === 'ready' && job.project) {
+            if (!await useProjectStore.getState().save(job.project)) throw new Error('Could not save the completed remix.');
+            const complete = await fetch('/api/remix-jobs', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: job.id }) });
+            if (!complete.ok) throw new Error('Could not complete the remix job.');
+          } else if (job.status === 'failed') {
+            setRemixJobError(job.error || 'Remix failed.');
+            await fetch('/api/remix-jobs', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: job.id }) });
+          }
+        }
+        const pending = jobs.find((job) => job.status === 'queued' || job.status === 'running');
+        remixingRef.current = Boolean(pending);
+        setRemixingSource(pending ? useProjectStore.getState().get(pending.sourceProjectId) ?? null : null);
+      } catch (error) {
+        if (active) setRemixJobError(error instanceof Error ? error.message : 'Could not load remix jobs.');
+      } finally { polling = false; }
+    };
+    void poll();
+    const interval = setInterval(() => void poll(), 2000);
+    return () => { active = false; clearInterval(interval); };
+  }, [loaded]);
 
   useEffect(() => {
     const stored = localStorage.getItem(PROJECT_VIEW_KEY);
@@ -175,6 +210,7 @@ export default function DashboardPage() {
             {storageError}
           </div>
         )}
+        {remixJobError && <div className="mb-6 rounded-md border border-destructive p-3 text-sm text-destructive" role="alert">{remixJobError}</div>}
         {templateStorageError && (
           <div
             className="mb-6 rounded-md border border-destructive p-3 text-sm text-destructive"
@@ -279,6 +315,7 @@ export default function DashboardPage() {
         remixProject={remixProject}
         onRemixPendingChange={(pending) => {
           remixingRef.current = pending;
+          if (pending) setRemixJobError('');
           setRemixingSource(pending ? remixProject : null);
         }}
         onOpenChange={(open) => {

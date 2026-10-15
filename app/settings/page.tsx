@@ -13,8 +13,38 @@ export default function SettingsPage() {
   const [key, setKey] = useState('');
   const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState('');
+  const [imageModel, setImageModel] = useState('');
+  const [effectiveModel, setEffectiveModel] = useState('');
+  const [imageModelMessage, setImageModelMessage] = useState('');
+  const [savingImageModel, setSavingImageModel] = useState(false);
 
   useEffect(() => { setSaved(Boolean(getUserApiKey())); }, []);
+  useEffect(() => {
+    void fetch('/api/settings/image-model', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Could not load the image model setting.');
+        return response.json() as Promise<{ model: string | null; effectiveModel: string }>;
+      })
+      .then((result) => { setImageModel(result.model ?? ''); setEffectiveModel(result.effectiveModel); })
+      .catch((error) => setImageModelMessage(error instanceof Error ? error.message : 'Could not load the image model setting.'));
+  }, []);
+
+  async function saveImageModel(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSavingImageModel(true);
+    setImageModelMessage('');
+    try {
+      const response = await fetch('/api/settings/image-model', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: imageModel.trim() }),
+      });
+      const result = await response.json() as { effectiveModel?: string; error?: string };
+      if (!response.ok || !result.effectiveModel) throw new Error(result.error || 'Could not save the image model.');
+      setImageModel(imageModel.trim());
+      setEffectiveModel(result.effectiveModel);
+      setImageModelMessage('Image model saved.');
+    } catch (error) { setImageModelMessage(error instanceof Error ? error.message : 'Could not save the image model.'); }
+    finally { setSavingImageModel(false); }
+  }
 
   function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,6 +76,17 @@ export default function SettingsPage() {
         <Button type="button" variant={theme === 'light' ? 'default' : 'outline'} aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>Light</Button>
         <Button type="button" variant={theme === 'dark' ? 'default' : 'outline'} aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>Dark</Button>
       </div>
+    </section>
+    <section className="mt-6 rounded-xl border border-border bg-card p-6">
+      <h2 className="text-xl font-semibold">Image generation model</h2>
+      <p className="mt-2 text-sm text-muted-foreground">Choose the OpenAI image model used for new images, remixes, and workflow image generation.</p>
+      <form onSubmit={saveImageModel} className="mt-5 space-y-3">
+        <Label htmlFor="image-model">Model ID</Label>
+        <Input id="image-model" value={imageModel} onChange={(event) => setImageModel(event.target.value)} maxLength={100} spellCheck={false} placeholder="Use the configured default" />
+        <p className="text-sm text-muted-foreground">Current model: {effectiveModel || 'Loading…'}. Leave the field blank to use the server default.</p>
+        <Button type="submit" disabled={savingImageModel}>{savingImageModel ? 'Saving…' : 'Save image model'}</Button>
+      </form>
+      {imageModelMessage && <p role="status" className="mt-3 text-sm">{imageModelMessage}</p>}
     </section>
     <section className="mt-6 rounded-xl border border-border bg-card p-6">
       <h2 className="text-xl font-semibold">OpenAI API key</h2>
