@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { DashboardHeader } from "@/components/dashboard/header";
+import { DashboardShell } from "@/components/dashboard/shell";
 import { Card } from "@/components/ui/card";
 import { AccountCalendar } from "@/components/accounts/account-calendar";
 import { dateKey, postDate, timeValue } from "@/components/accounts/calendar-utils";
@@ -221,8 +221,7 @@ export default function AccountCalendarPage({
   };
 
   return (
-    <>
-      <DashboardHeader />
+    <DashboardShell>
       <main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
         <AccountPageHeader
           selected={selected}
@@ -298,6 +297,6 @@ export default function AccountCalendarPage({
           }}
         />
       </main>
-    </>
+    </DashboardShell>
   );
 }

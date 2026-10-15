@@ -11,7 +11,7 @@ import {
   fillTemplateFromData,
   projectFromTemplate,
 } from "@/lib/canvas/template-filler";
-import { DashboardHeader } from "@/components/dashboard/header";
+import { DashboardShell } from "@/components/dashboard/shell";
 import { DashboardOverview } from "@/components/dashboard/overview";
 import { ProjectSection } from "@/components/dashboard/project-section";
 import { ManagementDialogs } from "@/components/dashboard/management-dialogs";
@@ -20,7 +20,6 @@ import { GeneratorDialog } from "@/components/generator/generator-dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Clock, LayoutGrid } from "lucide-react";
-import { useTheme } from "@/components/theme-provider";
 
 const PROJECT_VIEW_KEY = "slidefarm-project-view";
 
@@ -67,7 +66,6 @@ export default function DashboardPage() {
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
-  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     load();
@@ -166,11 +164,8 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <DashboardHeader
-        onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
-        isDark={theme === "dark"}
-      />
+    <div className="h-screen overflow-hidden bg-background">
+      <DashboardShell>
       <main className="mx-auto max-w-7xl px-6 py-8">
         {storageError && (
           <div
@@ -277,6 +272,7 @@ export default function DashboardPage() {
           </TabsContent>
         </Tabs>
       </main>
+      </DashboardShell>
 
       <GeneratorDialog
         open={generatorOpen}

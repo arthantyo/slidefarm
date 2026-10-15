@@ -1,0 +1,10 @@
+{
+  "name": "slidefarm",
+  "version": "0.1.0",
+  "description": "SlideFarm desktop shell",
+  "main": "main.cjs",
+  "private": true,
+  "dependencies": {
+    "electron-log": "^5.4.4"
+  }
+}

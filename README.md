@@ -1,14 +1,45 @@
-# slideshow
+# SlideFarm
+
+SlideFarm runs as an Electron desktop app with a local Next.js server.
+
+## Desktop app
+
+- `npm install` installs the desktop and web dependencies.
+- `npm run desktop` installs the small Electron shell dependency, then starts Electron and the local Next.js development server.
+- `npm run desktop:build` creates a production build and a platform installer in `dist/`.
+
+The desktop server binds to `127.0.0.1` on an available port. Electron stores project data in its user data directory. Personal OpenAI API keys entered in Settings are stored in the Electron profile for that computer.
+
+## Set up AI features
+
+SlideFarm uses an **OpenAI API key** for slide generation, remixing, image
+generation, text rewriting, and captions. Your ChatGPT password or subscription
+cannot be entered in the API key field. API usage has its own billing.
+
+1. Sign in to the [OpenAI API key page](https://platform.openai.com/api-keys)
+   and create a standard API key. Copy the new key when it is shown.
+2. If needed, set up credits or a payment method in
+   [API billing](https://platform.openai.com/settings/organization/billing/overview).
+3. Open **Settings** in SlideFarm, paste the key into **OpenAI API key**, and
+   select **Save key**.
+4. Try generating a slide or image. Saving a key does not validate it; if the
+   request fails, check the key and API billing, then replace the key in
+   Settings.
+
+The key is saved locally in the Electron profile on this device and is sent to
+SlideFarm's local server for those AI requests. Anyone with access to this
+device can use a saved key. Use **Remove key** in Settings to clear it. Workflow
+jobs currently use the server's `OPENAI_API_KEY` instead of the key in Settings.
 
 Projects and folders are saved to `projects.json` in the local app data directory
 (`%APPDATA%\\SlideFarm` on Windows, `~/Library/Application Support/SlideFarm`
 on macOS, or `$XDG_DATA_HOME/SlideFarm` on Linux). Set `SLIDEFARM_DATA_DIR`
-to override that directory; an Electron main process can set it to
+to override that directory. The Electron main process sets it to
 `app.getPath('userData')` before starting the Next.js server. The first local
 load migrates projects and folders from the old browser storage.
 
-The file API accepts requests only on a localhost URL. A future Electron
-wrapper should bind its Next.js server to the loopback interface.
+The file API accepts requests only on a localhost URL. The Electron
+server binds to the loopback interface.
 
 ## TikTok sandbox
 

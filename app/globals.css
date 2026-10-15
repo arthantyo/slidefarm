@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+.app-titlebar {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.app-titlebar button,
+.app-titlebar a,
+.app-titlebar input,
+.app-titlebar select,
+.app-titlebar textarea,
+.app-titlebar [role="button"],
+.app-titlebar .window-no-drag {
+  -webkit-app-region: no-drag;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

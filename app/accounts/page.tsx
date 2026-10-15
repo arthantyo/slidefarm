@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Ellipsis, ExternalLink, Settings, Trash2 } from "lucide-react";
-import { DashboardHeader } from "@/components/dashboard/header";
+import { DashboardShell } from "@/components/dashboard/shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -86,8 +86,7 @@ export default function AccountsPage() {
   };
 
   return (
-    <>
-      <DashboardHeader />
+    <DashboardShell>
       <main className="mx-auto max-w-5xl space-y-6 px-6 py-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -208,6 +207,6 @@ export default function AccountsPage() {
           </div>
         )}
       </main>
-    </>
+    </DashboardShell>
   );
 }

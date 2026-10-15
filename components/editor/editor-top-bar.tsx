@@ -46,8 +46,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useTheme } from "@/components/theme-provider";
-import { Moon, Sun } from "lucide-react";
+import { WindowControls } from "@/components/window-controls";
 
 interface EditorTopBarProps {
   onOpenGenerator?: () => void;
@@ -69,7 +68,6 @@ export function EditorTopBar({ onOpenGenerator }: EditorTopBarProps) {
   const saveProject = useProjectStore((s) => s.save);
   const storageError = useProjectStore((s) => s.storageError);
   const templateStorageError = useCustomTemplateStore((s) => s.storageError);
-  const { theme, setTheme } = useTheme();
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -172,7 +170,7 @@ export function EditorTopBar({ onOpenGenerator }: EditorTopBarProps) {
   };
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-border bg-card px-3">
+    <header className="app-titlebar flex h-14 items-center justify-between border-b border-border bg-card px-3">
       {/* Left: back + title */}
       <div className="flex items-center gap-3">
         <button
@@ -246,7 +244,7 @@ export function EditorTopBar({ onOpenGenerator }: EditorTopBarProps) {
         </div>
       </div>
 
-      {/* Right: save + export + theme */}
+      {/* Right: save + export */}
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
@@ -319,16 +317,7 @@ export function EditorTopBar({ onOpenGenerator }: EditorTopBarProps) {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <button
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-border transition-colors hover:bg-accent"
-        >
-          {theme === "dark" ? (
-            <Sun className="h-4 w-4" />
-          ) : (
-            <Moon className="h-4 w-4" />
-          )}
-        </button>
+        <WindowControls />
       </div>
 
       <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>

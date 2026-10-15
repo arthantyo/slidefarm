@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { DashboardHeader } from '@/components/dashboard/header';
+import { DashboardShell } from '@/components/dashboard/shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getUserApiKey, removeUserApiKey, saveUserApiKey } from '@/lib/ai/user-key';
+import { useTheme } from '@/components/theme-provider';
 
 export default function SettingsPage() {
+  const { theme, setTheme } = useTheme();
   const [key, setKey] = useState('');
   const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState('');
@@ -22,8 +24,8 @@ export default function SettingsPage() {
       saveUserApiKey(value);
       setKey('');
       setSaved(true);
-      setMessage('API key saved in this browser.');
-    } catch { setMessage('Could not save the key in this browser.'); }
+      setMessage('API key saved on this device. Try an AI action to check that it works.');
+    } catch { setMessage('Could not save the key on this device.'); }
   }
 
   function remove() {
@@ -31,15 +33,31 @@ export default function SettingsPage() {
       removeUserApiKey();
       setKey('');
       setSaved(false);
-      setMessage('API key removed from this browser.');
+      setMessage('API key removed from this device.');
     } catch { setMessage('Could not remove the key.'); }
   }
 
-  return <><DashboardHeader /><main className="mx-auto max-w-3xl px-6 py-8">
+  return <DashboardShell><main className="mx-auto max-w-3xl px-6 py-8">
     <h1 className="text-3xl font-bold">Settings</h1>
     <section className="mt-8 rounded-xl border border-border bg-card p-6">
+      <h2 className="text-xl font-semibold">Appearance</h2>
+      <p className="mt-2 text-sm text-muted-foreground">Choose how SlideFarm looks on this device.</p>
+      <div className="mt-4 flex gap-2" role="group" aria-label="Color theme">
+        <Button type="button" variant={theme === 'light' ? 'default' : 'outline'} aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>Light</Button>
+        <Button type="button" variant={theme === 'dark' ? 'default' : 'outline'} aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>Dark</Button>
+      </div>
+    </section>
+    <section className="mt-6 rounded-xl border border-border bg-card p-6">
       <h2 className="text-xl font-semibold">OpenAI API key</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Add your OpenAI API key for slide generation, remixing, image generation, text rewriting, and captions on this browser. The key is stored in this browser and sent to Slidefarm only for those requests. Workflow jobs continue to use the server key. Anyone with access to this browser can use the saved key.</p>
+      <p className="mt-2 text-sm text-muted-foreground">SlideFarm uses the OpenAI API for slide generation, remixing, images, text rewriting, and captions. You need an OpenAI API key from the API Platform. A ChatGPT login or subscription is not an API key.</p>
+      <div className="mt-5 rounded-lg border border-border bg-background p-4 text-sm">
+        <h3 className="font-semibold">Set up your key</h3>
+        <ol className="mt-3 list-decimal space-y-2 pl-5 text-muted-foreground">
+          <li>Sign in to the <a className="text-foreground underline underline-offset-2" href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI API key page</a> and create a standard API key. Copy it when it appears.</li>
+          <li>Check your <a className="text-foreground underline underline-offset-2" href="https://platform.openai.com/settings/organization/billing/overview" target="_blank" rel="noopener noreferrer">API billing settings</a> if your account needs credits or a payment method. API usage is billed separately from a ChatGPT subscription.</li>
+          <li>Paste the key below and select <strong className="text-foreground">Save key</strong>. Then try generating a slide or image.</li>
+        </ol>
+      </div>
       <p className="mt-3 text-sm">Status: {saved ? 'Key saved' : 'No personal key saved'}</p>
       <form onSubmit={save} className="mt-5 space-y-3">
         <Label htmlFor="openai-api-key">API key</Label>
@@ -47,6 +65,8 @@ export default function SettingsPage() {
         <div className="flex gap-3"><Button type="submit">Save key</Button>{saved && <Button type="button" variant="outline" onClick={remove}>Remove key</Button>}</div>
       </form>
       {message && <p role="status" className="mt-3 text-sm">{message}</p>}
+      <p className="mt-5 text-sm text-muted-foreground">Your key stays in this device&apos;s app profile and is sent to SlideFarm&apos;s local server for these AI requests. Saving it does not check whether it works. Anyone with access to this device can use the saved key. Workflow jobs use the server key.</p>
+      <p className="mt-3 text-sm text-muted-foreground">If an AI request fails, check that the key is active and that API billing is set up. Replace the saved key here if you created a new one.</p>
     </section>
-  </main></>;
+  </main></DashboardShell>;
 }

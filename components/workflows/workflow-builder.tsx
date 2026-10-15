@@ -14,6 +14,7 @@ import { WorkflowNodeSettings } from "./workflow-node-settings";
 import { WorkflowReviewPanel } from "./workflow-review-panel";
 import { useWorkflowDocument } from "./use-workflow-document";
 import { useWorkflowExecution } from "./use-workflow-execution";
+import { WindowControls } from "@/components/window-controls";
 
 export function WorkflowBuilder({ workflowId }: { workflowId: string }) {
   const [pan, setPan] = useState({ x: 80, y: 120 });
@@ -72,7 +73,7 @@ export function WorkflowBuilder({ workflowId }: { workflowId: string }) {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
-      <header className="flex h-14 items-center gap-3 border-b bg-card px-4">
+      <header className="app-titlebar flex h-14 items-center gap-3 border-b bg-card px-4">
         <Button
           asChild
           variant="ghost"
@@ -134,6 +135,7 @@ export function WorkflowBuilder({ workflowId }: { workflowId: string }) {
             Run workflow
           </Button>
         </div>
+        <WindowControls />
       </header>
       <section className="flex min-h-0 flex-1 flex-col">
         {!draft ? (
