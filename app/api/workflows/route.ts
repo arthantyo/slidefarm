@@ -16,7 +16,7 @@ const workflowSchema = z.object({
   projectFolderId: z.string().nullable().optional(),
   pendingProjectId: z.string().nullable().optional(),
   sourceType: z.enum(['json', 'ai']), sourceJson: z.string(),
-  systemPrompt: z.string(), templateId: z.string(),
+  systemPrompt: z.string(), model: z.string().trim().min(1).max(100).optional(), templateId: z.string(),
   exportFormat: z.enum(['zip', 'pdf', 'png', 'jpg']),
   createdAt: z.number(), updatedAt: z.number(),
 });

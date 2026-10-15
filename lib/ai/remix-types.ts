@@ -22,6 +22,7 @@ export interface RemixSource {
 export interface RemixRequest {
   source: RemixSource;
   instruction: string;
+  model?: string;
   tone: Tone;
   density: ContentDensity;
   language: string;

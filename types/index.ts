@@ -207,6 +207,7 @@ export interface Workflow {
   sourceType: 'json' | 'ai';
   sourceJson: string;
   systemPrompt: string;
+    model?: string;
   templateId: string;
   exportFormat: 'zip' | 'pdf' | 'png' | 'jpg';
   createdAt: number;
@@ -285,6 +286,7 @@ export type VisualStyle =
 
 export interface GenerationOptions {
   prompt: string;
+    model?: string;
   slideCount?: number | 'auto';
   platform?: string;
   aspectRatio?: AspectRatioKey;

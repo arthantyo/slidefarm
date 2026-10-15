@@ -92,7 +92,7 @@ export async function generateRemix(request: RemixRequest, userApiKey?: string):
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        model: request.model || process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages,
         temperature: 0.7,
         response_format: responseFormat,

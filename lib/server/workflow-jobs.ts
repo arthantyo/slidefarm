@@ -93,7 +93,7 @@ async function generate(job: WorkflowJob) {
   if (workflow.sourceType === 'ai') {
     if (!workflow.systemPrompt.trim() || !keys.length) throw new Error('Enter an AI prompt and choose a template with placeholders.');
     const result = await openAI('chat/completions', {
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini', temperature: 0.7, response_format: { type: 'json_object' },
+      model: workflow.model || process.env.OPENAI_MODEL || 'gpt-4o-mini', temperature: 0.7, response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: `${workflow.systemPrompt}\n\nReturn only a JSON object with exactly these template placeholder keys: ${JSON.stringify(keys)}. Each value must be a string or an array of strings. Use the source data as input. Do not add other keys. For these AI image placeholder keys, provide only the subject: ${JSON.stringify(subjectKeys)}.` },
         { role: 'user', content: JSON.stringify(source) },

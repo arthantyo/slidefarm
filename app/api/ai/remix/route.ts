@@ -27,6 +27,7 @@ const requestSchema = z.object({
     })).min(1).max(30),
   }),
   instruction: z.string().trim().min(3).max(2000),
+  model: z.string().trim().min(1).max(100).optional(),
   tone: z.enum(['educational', 'casual', 'professional', 'persuasive', 'inspirational']),
   density: z.enum(['concise', 'balanced', 'detailed']),
   language: z.string().max(100),

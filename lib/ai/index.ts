@@ -115,7 +115,7 @@ async function callOpenAI(
 ): Promise<string> {
   if (!apiKey) throw new Error('No OPENAI_API_KEY');
 
-  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  const model = options.model || process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',

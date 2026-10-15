@@ -73,6 +73,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
   const setGenerationProgress = useEditorStore((s) => s.setGenerationProgress);
 
   const [prompt, setPrompt] = useState('');
+  const [model, setModel] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [autoSlideCount, setAutoSlideCount] = useState(true);
   const [slideCount, setSlideCount] = useState(6);
@@ -121,6 +122,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
       const endpoint = remixProject ? '/api/ai/remix' : '/api/ai/generate';
       const options: GenerationOptions = {
         prompt: prompt.trim(),
+        model: model.trim() || undefined,
         slideCount: autoSlideCount ? 'auto' : slideCount,
         platform,
         aspectRatio: preset.aspectRatio,
@@ -160,6 +162,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
           })),
         },
         instruction: prompt.trim(),
+        model: model.trim() || undefined,
         tone,
         density,
         language,
@@ -253,6 +256,12 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
                 ? 'Say what audience, angle, or message you want to change. The existing slide design stays in place.'
                 : 'Tip: Include the number of slides, topic, and style for best results.'}
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="generation-model">Model</Label>
+            <Input id="generation-model" value={model} onChange={(event) => setModel(event.target.value)} placeholder="Default model" maxLength={100} />
+            <p className="text-xs text-muted-foreground">Enter an OpenAI chat model ID, or leave blank to use the configured default.</p>
           </div>
 
           {remixProject && (

@@ -38,7 +38,7 @@ export function DashboardOverview({
               social media platform.
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          {/* <div className="flex flex-col gap-2 sm:flex-row">
             <Button size="lg" onClick={onGenerate} className="gap-2 text-base">
               <Sparkles className="h-5 w-5" />
               Generate with AI
@@ -52,7 +52,7 @@ export function DashboardOverview({
               <Plus className="h-5 w-5" />
               Blank Project
             </Button>
-          </div>
+          </div> */}
         </div>
       </Cloudscape>
 
