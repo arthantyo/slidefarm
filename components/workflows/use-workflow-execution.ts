@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { fillTemplateFromData } from '@/lib/canvas/template-filler';
+import { fillTemplateFromData, loadTemplateCollectionImages } from '@/lib/canvas/template-filler';
 import { exportWorkflowToMedia } from '@/lib/workflows/export-media';
 import { sendWorkflowToTikTok } from '@/lib/workflows/send-tiktok';
 import { useProjectStore } from '@/stores/project-store';
@@ -104,7 +104,8 @@ export function useWorkflowExecution(workflowId: string, document: ReturnType<ty
       const data = job.data;
       setNodeStatus('source', 'complete');
       setNodeStatus('template', 'processing');
-      const project = fillTemplateFromData(template, data, `${draft.name} - ${new Date().toLocaleString()}`);
+      const collectionImages = await loadTemplateCollectionImages(template);
+      const project = fillTemplateFromData(template, data, `${draft.name} - ${new Date().toLocaleString()}`, collectionImages);
       for (const [location, src] of Object.entries(job.images ?? {})) {
         const [slideIndex, elementIndex] = location.split(':').map(Number);
         const target = project.slides[slideIndex]?.elements[elementIndex];

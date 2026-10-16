@@ -1,10 +1,20 @@
 import { nanoid } from 'nanoid';
 import type { Project, Slide, CanvasElement, CustomTemplate, Template } from '@/types';
+import type { LibraryImage } from '@/lib/server/image-library';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 /** Placeholder values are shared strings or per-occurrence arrays of strings. */
 export type TemplateData = Record<string, string | string[]>;
+
+export async function loadTemplateCollectionImages(template: Template | Project): Promise<LibraryImage[]> {
+  if (!template.slides.some((slide) => slide.elements.some((element) => element.type === 'background' && element.fillType === 'image' && element.imageCollectionId))) return [];
+  const response = await fetch('/api/image-library', { cache: 'no-store' });
+  if (!response.ok) throw new Error('Could not load template image collections.');
+  const library = await response.json() as { images?: LibraryImage[] };
+  if (!Array.isArray(library.images)) throw new Error('Could not load template image collections.');
+  return library.images;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -41,13 +51,18 @@ function fillElement(
 }
 
 /** Deep-clone slides and apply data substitutions */
-function fillSlides(slides: Slide[], data: TemplateData): Slide[] {
+function fillSlides(slides: Slide[], data: TemplateData, collectionImages: LibraryImage[] = []): Slide[] {
   const occurrenceCounts = new Map<string, number>();
   return slides.map((slide) => ({
     ...slide,
     id: nanoid(10),
     elements: slide.elements.map((el) => {
       const cloned = el.type === 'background' ? { ...el } : { ...el, id: nanoid(10) };
+      if (cloned.type === 'background' && cloned.fillType === 'image' && cloned.imageCollectionId) {
+        const candidates = collectionImages.filter((image) => image.folderId === cloned.imageCollectionId);
+        if (!candidates.length) throw new Error(`The image collection for slide "${slide.name}" is empty or unavailable.`);
+        cloned.imageSrc = candidates[Math.floor(Math.random() * candidates.length)].src;
+      }
       if ((el.type !== 'text' && el.type !== 'image') || !el.placeholder || !Array.isArray(data[el.placeholder])) {
         return fillElement(cloned, data, 0);
       }
@@ -83,8 +98,9 @@ export function fillTemplateFromData(
   template: Template | Project,
   data: TemplateData,
   projectName?: string,
+  collectionImages: LibraryImage[] = [],
 ): Project {
-  const slides = fillSlides(template.slides, data);
+  const slides = fillSlides(template.slides, data, collectionImages);
   return {
     id: nanoid(10),
     name: projectName ?? template.name,

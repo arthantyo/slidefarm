@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import type { ImageLibrary } from '@/lib/server/image-library';
 import { useEditorStore } from '@/stores/editor-store';
 import { createTextElement, createShapeElement, createImageElement } from '@/lib/canvas/element-factory';
 import { Button } from '@/components/ui/button';
@@ -25,6 +27,11 @@ interface LeftSidebarProps {
 export function LeftSidebar({ onOpenGenerator }: LeftSidebarProps) {
   const [tab, setTab] = useState<Tab>('text');
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [library, setLibrary] = useState<ImageLibrary>({ folders: [], images: [] });
+  useEffect(() => {
+    if (tab !== 'images') return;
+    void fetch('/api/image-library').then((response) => response.json()).then((result: ImageLibrary) => { if (Array.isArray(result.images)) setLibrary(result); }).catch(() => {});
+  }, [tab]);
   const { project, addElement } = useEditorStore();
 
   if (!project) return null;
@@ -211,6 +218,8 @@ export function LeftSidebar({ onOpenGenerator }: LeftSidebarProps) {
               {tab === 'images' && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold">Images</h3>
+                  <div className="flex items-center justify-between"><span className="text-xs text-muted-foreground">Your images</span><Link href="/images" className="text-xs text-primary hover:underline">Manage</Link></div>
+                  <div className="grid grid-cols-2 gap-2">{library.images.map((image) => <button key={image.id} type="button" title={`Add ${image.name} to slide`} onClick={() => addImageByUrl(image.src)} className="overflow-hidden rounded border hover:border-primary"><img src={image.src} alt={image.name} className="aspect-square w-full object-cover" /></button>)}</div>
                   <ImageGenerator
                     width={project.dimensions.width * 0.5}
                     height={project.dimensions.height * 0.3}

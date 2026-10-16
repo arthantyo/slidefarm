@@ -27,7 +27,7 @@ import type { Tone, ContentDensity, Project, TextElement } from '@/types';
 import { useEditorStore } from '@/stores/editor-store';
 import { useProjectStore } from '@/stores/project-store';
 import { isRemixableTextElement } from '@/lib/ai/assembly';
-import { fillTemplateFromData } from '@/lib/canvas/template-filler';
+import { fillTemplateFromData, loadTemplateCollectionImages } from '@/lib/canvas/template-filler';
 import { useCustomTemplateStore } from '@/stores/custom-template-store';
 
 interface GeneratorDialogProps {
@@ -175,7 +175,8 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
 
       setGenerationProgress({ stage: 'Assembling slides', current: 4, total: 6 });
 
-      const project = fillTemplateFromData(template!, result.data, prompt.trim().slice(0, 100));
+      const collectionImages = await loadTemplateCollectionImages(template!);
+      const project = fillTemplateFromData(template!, result.data, prompt.trim().slice(0, 100), collectionImages);
 
       setGenerationProgress({ stage: 'Preparing editor', current: 5, total: 6 });
 

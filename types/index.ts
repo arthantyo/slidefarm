@@ -106,10 +106,13 @@ export interface ShapeElement extends BaseElement {
 
 export interface BackgroundElement extends BaseElement {
   type: 'background';
-  fillType: 'solid' | 'gradient';
+  fillType: 'solid' | 'gradient' | 'image';
   fill: string;
   gradientColor2?: string;
   gradientAngle?: number;
+  /** Fixed image for this slide; replaced at generation time when imageCollectionId is set. */
+  imageSrc?: string;
+  imageCollectionId?: string;
 }
 
 // ─── Discriminated Union ─────────────────────────────────────────────────────

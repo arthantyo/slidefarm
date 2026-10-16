@@ -17,6 +17,9 @@ export default function SettingsPage() {
   const [effectiveModel, setEffectiveModel] = useState('');
   const [imageModelMessage, setImageModelMessage] = useState('');
   const [savingImageModel, setSavingImageModel] = useState(false);
+  const [pinterest, setPinterest] = useState({ key: '', hasKey: false, host: '', searchPath: '', boardPath: '' });
+  const [pinterestMessage, setPinterestMessage] = useState('');
+  const [savingPinterest, setSavingPinterest] = useState(false);
 
   useEffect(() => { setSaved(Boolean(getUserApiKey())); }, []);
   useEffect(() => {
@@ -28,6 +31,24 @@ export default function SettingsPage() {
       .then((result) => { setImageModel(result.model ?? ''); setEffectiveModel(result.effectiveModel); })
       .catch((error) => setImageModelMessage(error instanceof Error ? error.message : 'Could not load the image model setting.'));
   }, []);
+  useEffect(() => {
+    void fetch('/api/settings/pinterest', { cache: 'no-store' })
+      .then(async (response) => { const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Could not load Pinterest settings.'); return result; })
+      .then((result) => setPinterest((current) => ({ ...current, ...result })))
+      .catch((error) => setPinterestMessage(error instanceof Error ? error.message : 'Could not load Pinterest settings.'));
+  }, []);
+
+  async function savePinterest(removeKey = false) {
+    setSavingPinterest(true); setPinterestMessage('');
+    try {
+      const response = await fetch('/api/settings/pinterest', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...pinterest, removeKey }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not save Pinterest settings.');
+      setPinterest({ ...result, key: '' });
+      setPinterestMessage(removeKey ? 'RapidAPI key removed.' : 'Pinterest settings saved.');
+    } catch (error) { setPinterestMessage(error instanceof Error ? error.message : 'Could not save Pinterest settings.'); }
+    finally { setSavingPinterest(false); }
+  }
 
   async function saveImageModel(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -87,6 +108,24 @@ export default function SettingsPage() {
         <Button type="submit" disabled={savingImageModel}>{savingImageModel ? 'Saving…' : 'Save image model'}</Button>
       </form>
       {imageModelMessage && <p role="status" className="mt-3 text-sm">{imageModelMessage}</p>}
+    </section>
+    <section className="mt-6 rounded-xl border border-border bg-card p-6">
+      <h2 className="text-xl font-semibold">Pinterest import</h2>
+      <p className="mt-2 text-sm text-muted-foreground">Connect a Pinterest provider from RapidAPI to search pins and import board images. Your key is saved on this device and used by the local server.</p>
+      <form onSubmit={(event) => { event.preventDefault(); void savePinterest(); }} className="mt-5 space-y-3">
+        <Label htmlFor="pinterest-key">RapidAPI key</Label>
+        <Input id="pinterest-key" type="password" autoComplete="off" spellCheck={false} value={pinterest.key} onChange={(event) => setPinterest({ ...pinterest, key: event.target.value })} placeholder={pinterest.hasKey ? 'Key saved — enter a new key to replace it' : 'Enter your RapidAPI key'} />
+        <p className="text-xs text-muted-foreground">Status: {pinterest.hasKey ? 'Key saved' : 'No key saved'}</p>
+        <Label htmlFor="pinterest-host">RapidAPI host</Label>
+        <Input id="pinterest-host" spellCheck={false} value={pinterest.host} onChange={(event) => setPinterest({ ...pinterest, host: event.target.value })} placeholder="provider.p.rapidapi.com" />
+        <Label htmlFor="pinterest-search-path">Pin search endpoint path</Label>
+        <Input id="pinterest-search-path" spellCheck={false} value={pinterest.searchPath} onChange={(event) => setPinterest({ ...pinterest, searchPath: event.target.value })} placeholder="/search" />
+        <Label htmlFor="pinterest-board-path">Board endpoint path</Label>
+        <Input id="pinterest-board-path" spellCheck={false} value={pinterest.boardPath} onChange={(event) => setPinterest({ ...pinterest, boardPath: event.target.value })} placeholder="/board" />
+        <p className="text-xs text-muted-foreground">The search endpoint receives a <code>query</code> parameter; the board endpoint receives a <code>url</code> parameter. Choose a RapidAPI provider that supports both.</p>
+        <div className="flex gap-2"><Button type="submit" disabled={savingPinterest || (!pinterest.key && !pinterest.hasKey)}>Save Pinterest settings</Button>{pinterest.hasKey && <Button type="button" variant="outline" disabled={savingPinterest} onClick={() => void savePinterest(true)}>Remove key</Button>}</div>
+      </form>
+      {pinterestMessage && <p role="status" className="mt-3 text-sm">{pinterestMessage}</p>}
     </section>
     <section className="mt-6 rounded-xl border border-border bg-card p-6">
       <h2 className="text-xl font-semibold">OpenAI API key</h2>

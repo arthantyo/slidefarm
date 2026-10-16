@@ -9,6 +9,7 @@ import { useCustomTemplateStore } from "@/stores/custom-template-store";
 import { createBlankProject } from "@/lib/canvas/templates";
 import {
   fillTemplateFromData,
+  loadTemplateCollectionImages,
   projectFromTemplate,
 } from "@/lib/canvas/template-filler";
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -192,7 +193,8 @@ export default function DashboardPage() {
   const openTemplate = async (
     template: Parameters<typeof fillTemplateFromData>[0],
   ) => {
-    const project = fillTemplateFromData(template, {}, template.name);
+    const collectionImages = await loadTemplateCollectionImages(template);
+    const project = fillTemplateFromData(template, {}, template.name, collectionImages);
     if (!(await useProjectStore.getState().save(project))) return;
     loadProject(project);
     router.push(`/editor/${project.id}`);
@@ -286,10 +288,12 @@ export default function DashboardPage() {
               customTemplates={customTemplates}
               onUseTemplate={openTemplate}
               onFillTemplate={async (template, data) => {
+                const collectionImages = await loadTemplateCollectionImages(template);
                 const project = fillTemplateFromData(
                   template,
                   data,
                   template.name,
+                  collectionImages,
                 );
                 if (!(await useProjectStore.getState().save(project))) return;
                 loadProject(project);

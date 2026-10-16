@@ -121,6 +121,10 @@
       {
         "from": ".next/static",
         "to": "server/.next/static"
+      },
+      {
+        "from": "app/assets/icon.png",
+        "to": "icons/icon.png"
       }
     ],
     "asar": true,
@@ -131,7 +135,8 @@
       "target": "dmg"
     },
     "linux": {
-      "target": "AppImage"
+      "target": "AppImage",
+      "icon": "app/assets/icon.png"
     }
   }
 }

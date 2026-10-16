@@ -50,6 +50,13 @@ export async function renderSlideToCanvas(
       ctx.fillStyle = bg.fill || "#ffffff";
     }
     ctx.fillRect(0, 0, width, height);
+    if (bg.fillType === 'image' && bg.imageSrc) {
+      const image = await loadImage(bg.imageSrc);
+      const scale = Math.max(width / image.width, height / image.height);
+      const drawWidth = image.width * scale;
+      const drawHeight = image.height * scale;
+      ctx.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+    }
   }
 
   // 2. Preload all visible images

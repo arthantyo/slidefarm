@@ -12,6 +12,7 @@ function renderElementToSVG(el: CanvasElement, width: number, height: number): s
 
   if (el.type === 'background') {
     const bg = el as BackgroundElement;
+    if (bg.fillType === 'image' && bg.imageSrc) return `<defs><clipPath id="bg-clip"><rect width="${width}" height="${height}"/></clipPath></defs><image href="${escapeXML(bg.imageSrc)}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice" clip-path="url(#bg-clip)"/>`;
     if (bg.fillType === 'gradient' && bg.gradientColor2) {
       const angle = bg.gradientAngle ?? 135;
       const rad = (angle * Math.PI) / 180;

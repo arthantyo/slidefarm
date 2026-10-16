@@ -10,6 +10,7 @@ interface BackgroundRendererProps {
 }
 
 export function BackgroundRenderer({ element, width, height }: BackgroundRendererProps) {
+  if (element.fillType === 'image' && element.imageSrc) return <div className="pointer-events-none absolute inset-0 select-none overflow-hidden" style={{ width, height, backgroundColor: element.fill, backgroundImage: `url(${element.imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />;
   if (element.fillType === 'gradient' && element.gradientColor2) {
     const angle = element.gradientAngle ?? 135;
     return (

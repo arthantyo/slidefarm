@@ -17,6 +17,7 @@ interface SlideThumbnailProps {
 }
 
 function getBackgroundStyle(el: BackgroundElement, width: number, height: number): React.CSSProperties {
+  if (el.fillType === 'image' && el.imageSrc) return { backgroundColor: el.fill, backgroundImage: `url(${el.imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' };
   if (el.fillType === 'gradient' && el.gradientColor2) {
     const angle = el.gradientAngle ?? 135;
     return {
