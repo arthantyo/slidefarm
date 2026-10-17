@@ -1,53 +1,87 @@
-# SlideFarm
+<p align="center"><img src="images/icon.png" alt="SlideFarm icon" width="96" height="96"></p>
 
-SlideFarm runs as an Electron desktop app with a local Next.js server.
+<h1 align="center">SlideFarm</h1>
 
-## Desktop app
+<p align="center"><strong>Create, edit, and export social media slideshows from your desktop.</strong></p>
 
-- `npm install` installs the desktop and web dependencies.
-- `npm run desktop` installs the small Electron shell dependency, then starts Electron and the local Next.js development server.
-- `npm run desktop:build` creates a production build and a platform installer in `dist/`.
+<p align="center">Design slides on a visual canvas, reuse your own templates, and generate content with optional AI tools. Built with Next.js, React, TypeScript, Electron, and Konva.</p>
 
-The desktop server binds to `127.0.0.1` on an available port. Electron stores project data in its user data directory. Personal OpenAI API keys entered in Settings are stored in the Electron profile for that computer.
+<p align="center">
+  <a href="#create-and-edit">Create and edit</a> ·
+  <a href="#workflows">Workflows</a> ·
+  <a href="#export">Export</a> ·
+  <a href="#get-started">Get started</a> ·
+  <a href="#status">Status</a> ·
+  <a href="#development">Development</a>
+</p>
 
-## Set up AI features
+<p align="center"><img src="images/preview.png" alt="SlideFarm dashboard showing projects and slideshow previews" width="100%"></p>
 
-SlideFarm uses an **OpenAI API key** for slide generation, remixing, image
-generation, text rewriting, and captions. Your ChatGPT password or subscription
-cannot be entered in the API key field. API usage has its own billing.
+SlideFarm runs as an Electron app with a local Next.js server. You can create slides without an account or API key. AI generation and TikTok sandbox posting are available when you configure their respective services.
 
-1. Sign in to the [OpenAI API key page](https://platform.openai.com/api-keys)
-   and create a standard API key. Copy the new key when it is shown.
-2. If needed, set up credits or a payment method in
-   [API billing](https://platform.openai.com/settings/organization/billing/overview).
-3. Open **Settings** in SlideFarm, paste the key into **OpenAI API key**, and
-   select **Save key**.
-4. Try generating a slide or image. Saving a key does not validate it; if the
-   request fails, check the key and API billing, then replace the key in
-   Settings.
+## Create and edit
 
-The key is saved locally in the Electron profile on this device and is sent to
-SlideFarm's local server for those AI requests. Anyone with access to this
-device can use a saved key. Use **Remove key** in Settings to clear it. Workflow
-jobs currently use the server's `OPENAI_API_KEY` instead of the key in Settings.
+<p align="center"><img src="images/edit-preview.png" alt="SlideFarm editor showing a portrait slide, text controls, and slide thumbnails" width="100%"></p>
 
-Projects and folders are saved to `projects.json` in the local app data directory
-(`%APPDATA%\\SlideFarm` on Windows, `~/Library/Application Support/SlideFarm`
-on macOS, or `$XDG_DATA_HOME/SlideFarm` on Linux). Set `SLIDEFARM_DATA_DIR`
-to override that directory. The Electron main process sets it to
-`app.getPath('userData')` before starting the Next.js server. The first local
-load migrates projects and folders from the old browser storage.
+- **Start your way.** Create a blank project, generate slides with AI, or reuse a template you saved from an earlier project. The template gallery has no bundled starter templates yet.
+- **Work on a canvas.** Add and arrange slide elements in the editor, manage multiple slides, and organize projects into folders.
+- **Reuse layouts.** Save a project as a custom template and fill its text and image placeholders with new content.
 
-The file API accepts requests only on a localhost URL. The Electron
-server binds to the loopback interface.
+## Workflows
 
-## TikTok sandbox
+<p align="center"><img src="images/workflow-preview.png" alt="SlideFarm workflow canvas connecting source, template, review, export, and TikTok nodes" width="100%"></p>
 
-In your TikTok Developer sandbox, enable Login Kit and the Content Posting API,
-allow the `user.info.basic` and `video.publish` scopes, and register the callback
-URL. Set these server environment variables:
+Connect source, template, review, export, and TikTok steps on a visual workflow canvas. Configure each node, review slides before delivery, and run the workflow from the editor. AI workflow jobs require a server-side API key; TikTok steps require the sandbox integration described below.
 
-```text
+## Export
+
+| Format | Output |
+| --- | --- |
+| PNG or JPG | First slide |
+| PDF | All slides in one document |
+| ZIP | All slides as numbered PNG files |
+| JSON | Project data |
+
+Exports use the project's slide dimensions. The JSON export preserves the project structure for data transfer; image and PDF exports are rendered output.
+
+## Get started
+
+**Requirements:** Node.js and npm. Use a current Node.js LTS release.
+
+```bash
+npm install
+npm run desktop
+```
+
+`npm run desktop` installs the Electron shell dependencies, then starts Electron and a local Next.js development server. On first launch, choose **Blank Project** or **Browse Templates**; an API key is only needed for AI features.
+
+To run the web app by itself:
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000`. Local file-backed features use the machine running the Next.js server, so the desktop app is the primary way to run SlideFarm.
+
+## AI setup (optional)
+
+SlideFarm uses an OpenAI API key for slide generation, remixing, image generation, rewriting, and captions. Create a key in the [OpenAI API dashboard](https://platform.openai.com/api-keys), then open **Settings** in SlideFarm, enter it under **OpenAI API key**, and select **Save key**. API usage is billed separately from ChatGPT. Saving a key does not validate it; if a request fails, check the key and API billing.
+
+The key is stored in the local Electron profile and sent to SlideFarm's local server for AI requests. Anyone with access to that profile can use it. Select **Remove key** in Settings to clear it. Workflow jobs currently use the server's `OPENAI_API_KEY` environment variable instead of the key saved in Settings.
+
+For server-side configuration, copy `.env.example` to `.env` and fill in only the values you need. Never commit real credentials. The example also lists optional model settings, TikTok, Cloudflare R2, and Pinterest variables.
+
+## Local data
+
+Projects and folders are stored in `projects.json` in SlideFarm's local app data directory: `%APPDATA%\SlideFarm` on Windows, `~/Library/Application Support/SlideFarm` on macOS, or `$XDG_DATA_HOME/SlideFarm` (usually `~/.local/share/SlideFarm`) on Linux. Set `SLIDEFARM_DATA_DIR` to use a different directory. Electron sets it to its user data directory when launching the server. The first local load migrates projects and folders from older browser storage.
+
+Back up the local data directory if you need to preserve projects, templates, or connected account data. The desktop server listens on `127.0.0.1` on an available port; file and account endpoints accept localhost requests.
+
+## TikTok sandbox (optional)
+
+In your TikTok Developer sandbox, enable Login Kit and Content Posting API, allow `user.info.basic` and `video.publish`, and register the exact callback URL. Configure these server variables in `.env`:
+
+```dotenv
 TIKTOK_CLIENT_KEY=your-sandbox-client-key
 TIKTOK_CLIENT_SECRET=your-sandbox-client-secret
 TIKTOK_REDIRECT_URI=https://your-app-domain.example/api/tiktok/callback
@@ -58,22 +92,41 @@ R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
 TIKTOK_VERIFIED_URL_PREFIX=https://slides.your-domain.example
 ```
 
-Register the exact callback URI in TikTok Login Kit. For a local SlideFarm
-server, an HTTPS tunnel can forward the Web callback to
-`/api/tiktok/callback`; account management remains on localhost. If you instead
-configure Desktop Login Kit, use a localhost callback such as
-`http://localhost:3000/api/tiktok/callback`; SlideFarm uses PKCE for that flow.
-Create an R2 bucket and an R2 API token with object write access to that bucket.
-Connect the bucket to a public custom domain and verify that domain for Content
-Posting in the TikTok sandbox. `TIKTOK_VERIFIED_URL_PREFIX` must be that domain's
-HTTPS origin. SlideFarm uploads project slides as `tiktok/slides/*.png` objects
-and gives TikTok the public R2 URLs. The Accounts page lists connected profiles;
-each profile has its own calendar. Scheduling a project exports its slides to
-R2 immediately, then the local SlideFarm server submits the post at the selected
-time. Keep that server running for scheduled posts and reopen the calendar after
-restarting it. Configure an R2 object
-lifecycle rule to remove old `tiktok/slides/` objects only after every scheduled
-post that uses them has run and TikTok has had time to fetch them.
-The account connection and posting endpoints remain available only through
-localhost. Connected account tokens stay in the local data directory. Sandbox
-posting is restricted to the TikTok accounts allowed in your sandbox.
+For a local server, an HTTPS tunnel can forward the web callback to `/api/tiktok/callback`; account management stays on localhost. For Desktop Login Kit, use a registered localhost callback such as `http://localhost:3000/api/tiktok/callback`; SlideFarm uses PKCE for that flow. To upload to the TikTok inbox, enable `video.upload` and reconnect the account.
+
+Create an R2 bucket and an API token with object write access. Connect the bucket to a public custom domain, verify that domain for Content Posting in the TikTok sandbox, and set `TIKTOK_VERIFIED_URL_PREFIX` to its HTTPS origin. SlideFarm uploads slides to `tiktok/slides/*.png` and passes the public URLs to TikTok.
+
+Each connected profile has its own calendar. Scheduling exports the slides to R2 immediately; the local SlideFarm server submits the post at the chosen time. Keep the server running for scheduled posts and reopen the calendar after restarting it. If you configure an R2 lifecycle rule, retain the files until TikTok has fetched them. Connected account tokens stay in the local data directory. Sandbox posting is limited to accounts allowed in your TikTok sandbox.
+
+## Status
+
+SlideFarm is an early-stage project. The desktop app, canvas editor, custom templates, and export formats above are implemented. The template gallery currently has no bundled starter templates. TikTok posting targets the developer sandbox and depends on a running local server for scheduled posts. There are no prebuilt downloads documented here; build an installer from source with `npm run desktop:build`.
+
+## Development
+
+```bash
+npm run typecheck
+npm run lint
+npm run build
+```
+
+`npm run desktop:build` creates a production build and a platform installer in `dist/`.
+
+### Architecture
+
+| Area | Location |
+| --- | --- |
+| Next.js pages and API routes | `app/` |
+| Editor UI | `components/editor/` |
+| Canvas, templates, and snapping | `lib/canvas/` |
+| Export rendering | `lib/export/` |
+| Local data and integrations | `lib/server/` |
+| Editor and project state | `stores/` |
+| Shared project and element types | `types/index.ts` |
+| Desktop shell | `electron/` |
+
+See [AGENTS.md](AGENTS.md) for repository working practices. Issues and pull requests are welcome; describe the behavior you changed, keep changes focused, and run the relevant checks above.
+
+## License
+
+This repository does not currently include a license file. An explicit license is needed before others can reuse or redistribute the code under open source terms.
