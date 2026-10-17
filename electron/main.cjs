@@ -9,9 +9,15 @@ log.initialize();
 let server;
 let window;
 let serverUrl;
+const iconName =
+  process.platform === "win32"
+    ? "icon-windows.ico"
+    : process.platform === "darwin"
+      ? "icon-mac.icns"
+      : "icon-linux.png";
 const iconPath = app.isPackaged
-  ? path.join(process.resourcesPath, "icons", "icon.png")
-  : path.join(__dirname, "..", "app", "assets", "icon.png");
+  ? path.join(process.resourcesPath, "icons", iconName)
+  : path.join(__dirname, "..", "app", "assets", iconName);
 
 function freePort() {
   return new Promise((resolve, reject) => {

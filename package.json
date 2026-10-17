@@ -123,20 +123,30 @@
         "to": "server/.next/static"
       },
       {
-        "from": "app/assets/icon.png",
-        "to": "icons/icon.png"
+        "from": "app/assets/icon-windows.ico",
+        "to": "icons/icon-windows.ico"
+      },
+      {
+        "from": "app/assets/icon-mac.icns",
+        "to": "icons/icon-mac.icns"
+      },
+      {
+        "from": "app/assets/icon-linux.png",
+        "to": "icons/icon-linux.png"
       }
     ],
     "asar": true,
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "app/assets/icon-windows.ico"
     },
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "icon": "app/assets/icon-mac.icns"
     },
     "linux": {
       "target": "AppImage",
-      "icon": "app/assets/icon.png"
+      "icon": "app/assets/icon-linux.png"
     }
   }
 }
