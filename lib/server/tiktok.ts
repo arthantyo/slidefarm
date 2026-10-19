@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { dataDirectory } from './project-files';
+import { readTikTokSettings, type TikTokSettings } from './tiktok-settings';
 
 export interface TikTokAccount {
   openId: string;
@@ -13,10 +14,10 @@ export interface TikTokAccount {
 }
 
 const path = () => join(dataDirectory(), 'tiktok-accounts.json');
-export const configured = () => {
-  if (!process.env.TIKTOK_CLIENT_KEY || !process.env.TIKTOK_CLIENT_SECRET || !process.env.TIKTOK_REDIRECT_URI) return false;
+export const configured = (settings: TikTokSettings) => {
+  if (!settings.clientKey || !settings.clientSecret || !settings.redirectUri) return false;
   try {
-    const redirect = new URL(process.env.TIKTOK_REDIRECT_URI);
+    const redirect = new URL(settings.redirectUri);
     const validOrigin = local(redirect.hostname) ? ['http:', 'https:'].includes(redirect.protocol) && Boolean(redirect.port) : redirect.protocol === 'https:';
     return validOrigin && redirect.pathname === '/api/tiktok/callback' && !redirect.search && !redirect.hash && !redirect.username && !redirect.password;
   }
@@ -64,9 +65,10 @@ async function tokenRequest(body: URLSearchParams): Promise<TokenResponse> {
 }
 
 export async function exchangeCode(code: string, verifier?: string): Promise<TikTokAccount> {
+  const settings = await readTikTokSettings();
   const params = new URLSearchParams({
-    client_key: process.env.TIKTOK_CLIENT_KEY!, client_secret: process.env.TIKTOK_CLIENT_SECRET!,
-    code, grant_type: 'authorization_code', redirect_uri: process.env.TIKTOK_REDIRECT_URI!,
+    client_key: settings.clientKey, client_secret: settings.clientSecret,
+    code, grant_type: 'authorization_code', redirect_uri: settings.redirectUri,
   });
   if (verifier) params.set('code_verifier', verifier);
   const result = await tokenRequest(params);
@@ -82,11 +84,12 @@ export async function exchangeCode(code: string, verifier?: string): Promise<Tik
 }
 
 export async function accessToken(openId: string) {
+  const settings = await readTikTokSettings();
   const account = (await readAccounts()).find((item) => item.openId === openId);
   if (!account) throw new Error('TikTok account is not connected.');
   if (account.expiresAt > Date.now() + 60_000) return account.accessToken;
   const result = await tokenRequest(new URLSearchParams({
-    client_key: process.env.TIKTOK_CLIENT_KEY!, client_secret: process.env.TIKTOK_CLIENT_SECRET!,
+    client_key: settings.clientKey, client_secret: settings.clientSecret,
     grant_type: 'refresh_token', refresh_token: account.refreshToken,
   }));
   const refreshed = { ...account, accessToken: result.access_token!, refreshToken: result.refresh_token!, expiresAt: Date.now() + (result.expires_in ?? 86400) * 1000, scopes: (result.scope ?? account.scopes.join(',')).split(',') };
@@ -95,13 +98,14 @@ export async function accessToken(openId: string) {
 }
 
 export async function revokeAccount(openId: string) {
+  const settings = await readTikTokSettings();
   const account = (await readAccounts()).find((item) => item.openId === openId);
   if (!account) return;
-  if (configured()) {
+  if (configured(settings)) {
     const token = await accessToken(openId);
     const response = await fetch('https://open.tiktokapis.com/v2/oauth/revoke/', {
       method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_key: process.env.TIKTOK_CLIENT_KEY!, client_secret: process.env.TIKTOK_CLIENT_SECRET!, token }),
+      body: new URLSearchParams({ client_key: settings.clientKey, client_secret: settings.clientSecret, token }),
     });
     if (!response.ok) throw new Error('TikTok could not revoke access.');
   }

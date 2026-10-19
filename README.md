@@ -92,7 +92,7 @@ R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
 TIKTOK_VERIFIED_URL_PREFIX=https://slides.your-domain.example
 ```
 
-For a local server, an HTTPS tunnel can forward the web callback to `/api/tiktok/callback`; account management stays on localhost. For Desktop Login Kit, use a registered localhost callback such as `http://localhost:3000/api/tiktok/callback`; SlideFarm uses PKCE for that flow. To upload to the TikTok inbox, enable `video.upload` and reconnect the account.
+For a local server, an HTTPS tunnel can forward the web callback to `/api/tiktok/callback`; account management stays on localhost. For Desktop Login Kit, register a fixed callback such as `http://127.0.0.1:3000/api/tiktok/callback` in TikTok and enter that exact URI in Settings. SlideFarm listens on that callback port while its app server uses an available port, opens TikTok in the default browser, and returns the result to the desktop app through the `slidefarm://` link. The callback port must be free. Your browser may ask to open SlideFarm after authorization. SlideFarm uses PKCE for this flow. To upload to the TikTok inbox, enable `video.upload` and reconnect the account.
 
 Create an R2 bucket and an API token with object write access. Connect the bucket to a public custom domain, verify that domain for Content Posting in the TikTok sandbox, and set `TIKTOK_VERIFIED_URL_PREFIX` to its HTTPS origin. SlideFarm uploads slides to `tiktok/slides/*.png` and passes the public URLs to TikTok.
 

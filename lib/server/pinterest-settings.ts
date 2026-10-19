@@ -3,18 +3,15 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { dataDirectory } from './project-files';
 
-export interface PinterestSettings { key: string; host: string; searchPath: string; boardPath: string }
-const file = () => join(dataDirectory(), 'pinterest-settings.json');
+export interface PinterestSettings { token: string }
+const file = () => join(dataDirectory(), 'pinterest-apify-settings.json');
 
 export async function readPinterestSettings(): Promise<PinterestSettings> {
   let saved: Partial<PinterestSettings> = {};
   try { saved = JSON.parse(await readFile(file(), 'utf8')) as Partial<PinterestSettings>; }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
   return {
-    key: saved.key ?? process.env.RAPIDAPI_KEY ?? '',
-    host: saved.host ?? process.env.RAPIDAPI_PINTEREST_HOST ?? '',
-    searchPath: saved.searchPath ?? process.env.RAPIDAPI_PINTEREST_SEARCH_PATH ?? '',
-    boardPath: saved.boardPath ?? process.env.RAPIDAPI_PINTEREST_BOARD_PATH ?? '',
+    token: saved.token ?? process.env.APIFY_TOKEN ?? '',
   };
 }
 

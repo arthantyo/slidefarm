@@ -23,6 +23,15 @@ export default function AccountsPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  const connect = async () => {
+    if (!window.slidefarmWindow) { window.location.href = "/api/tiktok/connect"; return; }
+    setError("");
+    setBusy(true);
+    try { await window.slidefarmWindow?.connectTikTok(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not start TikTok connection."); }
+    finally { setBusy(false); }
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const authError = params.get("error");
@@ -95,9 +104,7 @@ export default function AccountsPage() {
               Manage your connected TikTok accounts and their content calendars.
             </p>
           </div>
-          <Button asChild>
-            <a href="/api/tiktok/connect">Connect account</a>
-          </Button>
+          <Button disabled={busy} onClick={() => void connect()}>Connect account</Button>
         </div>
         {error && (
           <p
@@ -114,8 +121,8 @@ export default function AccountsPage() {
         )}
         {!configured && (
           <Card className="p-5 text-sm text-muted-foreground">
-            Set the TikTok client key, secret, and registered redirect URI to
-            connect an account.
+            Set the TikTok client key, secret, and registered redirect URI in{' '}
+            <Link href="/settings" className="text-foreground underline underline-offset-2">Settings</Link> to connect an account.
           </Card>
         )}
         {accounts.length === 0 ? (

@@ -45,19 +45,24 @@ const responseFormat = {
 function normalizeResult(result: RemixResult, request: RemixRequest): RemixResult | null {
   if (result.slides.length !== request.source.slides.length) return null;
   if (result.slides.some((slide, index) => slide.texts.length < request.source.slides[index].texts.length)) return null;
+  const instruction = `${request.instruction} ${request.customInstructions ?? ''}`.toLowerCase().replace(/[’‘]/g, "'");
+  const imageNoun = '(?:images?|pictures?|photos?|logos?)';
+  const keepVerb = '(?:keep|preserve|retain|leave|do not change|don\'t change|dont change|not change|do not replace|don\'t replace|dont replace)';
+  const preserveAllImages = new RegExp(`\\b${keepVerb}\\s+(?:(?:all|every|the|my|original|existing|current|same)\\s+)*${imageNoun}\\b`).test(instruction) ||
+    new RegExp(`\\b${imageNoun}\\s+(?:unchanged|the same|as is)\\b`).test(instruction);
+  const preserveTopImage = new RegExp(`\\b${keepVerb}\\s+(?:(?:the|my|original|existing|current)\\s+)*(?:top|uppermost|header)\\s+${imageNoun}\\b`).test(instruction) ||
+    new RegExp(`\\b(?:top|uppermost|header)\\s+${imageNoun}\\s+(?:unchanged|the same|as is)\\b`).test(instruction);
+  const specifiedSlide = instruction.match(/\b(?:on|in)\s+slide\s+(\d+)\b/);
   return {
     ...result,
     slides: result.slides.map((slide, index) => {
       const source = request.source.slides[index];
       const texts = slide.texts.slice(0, source.texts.length);
-      const instruction = request.instruction.toLowerCase();
-      const preserveTopImage = /\b(top|uppermost|header)\b/.test(instruction) &&
-        /\b(image|picture|photo|logo)\b/.test(instruction) &&
-        /\b(keep|preserve|unchanged|shouldn'?t|shouldnt|don'?t|dont|do not|leave)\b/.test(instruction);
       const topImageIndex = source.images.reduce((top, image, imageIndex) =>
         top < 0 || image.y < source.images[top].y ? imageIndex : top, -1);
       const imagePrompts = source.images.map((image, imageIndex) => {
-        if (preserveTopImage && imageIndex === topImageIndex) return '';
+        if ((!specifiedSlide || Number(specifiedSlide[1]) === index + 1) &&
+          (preserveAllImages || (preserveTopImage && imageIndex === topImageIndex))) return '';
         const proposed = slide.imagePrompts[imageIndex]?.trim();
         if (proposed === '') return '';
         if (proposed && proposed.length >= 3) return proposed.slice(0, 1900);

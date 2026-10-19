@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('slidefarmWindow', {
   toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
   isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
   close: () => ipcRenderer.invoke('window:close'),
+  connectTikTok: () => ipcRenderer.invoke('tiktok:connect'),
   onMaximizedChange: (callback) => {
     const listener = (_event, maximized) => callback(maximized);
     ipcRenderer.on('window:maximized', listener);

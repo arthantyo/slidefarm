@@ -31,19 +31,21 @@ export async function GET(req: NextRequest) {
   const query = req.nextUrl.searchParams.get('query')?.trim();
   if (!query || query.length > 500 || !['search', 'board'].includes(mode || '')) return NextResponse.json({ error: 'Enter a search or board link.' }, { status: 400 });
   const settings = await readPinterestSettings();
-  const { key, host } = settings;
-  const path = mode === 'board' ? settings.boardPath : settings.searchPath;
-  if (!key || !host || !path) return NextResponse.json({ error: 'Configure Pinterest RapidAPI in Settings.' }, { status: 503 });
-  if (!/^[a-z0-9-]+\.p\.rapidapi\.com$/.test(host) || !path.startsWith('/') || path.startsWith('//')) return NextResponse.json({ error: 'Invalid Pinterest RapidAPI configuration.' }, { status: 503 });
+  if (!settings.token) return NextResponse.json({ error: 'Add your Apify API token in Settings.' }, { status: 503 });
   if (mode === 'board') {
     try { const url = new URL(query); if (url.protocol !== 'https:' || !/(^|\.)pinterest\.com$/.test(url.hostname)) throw new Error(); }
     catch { return NextResponse.json({ error: 'Enter a Pinterest board URL.' }, { status: 400 }); }
   }
   try {
-    const url = new URL(path, `https://${host}`);
-    url.searchParams.set(mode === 'board' ? 'url' : 'query', query);
-    const response = await fetch(url, { headers: { 'X-RapidAPI-Key': key, 'X-RapidAPI-Host': host }, cache: 'no-store', signal: AbortSignal.timeout(20000) });
-    if (!response.ok) return NextResponse.json({ error: `Pinterest provider returned ${response.status}.` }, { status: 502 });
+    const input = mode === 'board'
+      ? { startUrls: [query], maxItems: 20, endPage: 1, proxy: { useApifyProxy: true } }
+      : { search: query, maxItems: 20, endPage: 1, proxy: { useApifyProxy: true } };
+    const response = await fetch('https://api.apify.com/v2/actors/epctex~pinterest-scraper/run-sync-get-dataset-items?timeout=300', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${settings.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(input), cache: 'no-store', signal: AbortSignal.timeout(310000),
+    });
+    if (!response.ok) return NextResponse.json({ error: `Apify returned ${response.status}. Check your token and Actor access.` }, { status: 502 });
     return NextResponse.json({ images: extractImages(await response.json()) });
-  } catch { return NextResponse.json({ error: 'Could not load Pinterest images.' }, { status: 502 }); }
+  } catch { return NextResponse.json({ error: 'Could not load Pinterest images from Apify.' }, { status: 502 }); }
 }

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, ipcMain, shell } = require("electron");
 const { spawn } = require("node:child_process");
-const { createServer } = require("node:net");
+const { createServer: createNetServer } = require("node:net");
+const { createServer: createHttpServer } = require("node:http");
 const path = require("node:path");
 const log = require("electron-log/main");
 
@@ -9,6 +10,30 @@ log.initialize();
 let server;
 let window;
 let serverUrl;
+let tiktokCallbackServer;
+let tiktokCallbackOrigin;
+const deepLink = "slidefarm://tiktok-connected";
+if (process.defaultApp && process.argv.length >= 2) {
+  app.setAsDefaultProtocolClient("slidefarm", process.execPath, [path.resolve(process.argv[1])]);
+} else {
+  app.setAsDefaultProtocolClient("slidefarm");
+}
+const hasInstanceLock = app.requestSingleInstanceLock();
+if (!hasInstanceLock) app.quit();
+app.on("second-instance", () => {
+  if (window && !window.isDestroyed()) {
+    if (window.isMinimized()) window.restore();
+    window.show();
+    window.focus();
+  }
+});
+app.on("open-url", (event) => {
+  event.preventDefault();
+  if (window && !window.isDestroyed()) {
+    window.show();
+    window.focus();
+  }
+});
 const iconName =
   process.platform === "win32"
     ? "icon-windows.ico"
@@ -21,7 +46,7 @@ const iconPath = app.isPackaged
 
 function freePort() {
   return new Promise((resolve, reject) => {
-    const listener = createServer();
+    const listener = createNetServer();
     listener.once("error", reject);
     listener.listen(0, "127.0.0.1", () => {
       const address = listener.address();
@@ -122,7 +147,51 @@ async function createWindow(url) {
   await window.loadURL(url);
 }
 
-app
+async function listenForTikTokCallback(redirectUri) {
+  const redirect = new URL(redirectUri);
+  if (redirect.protocol !== "http:" || !["localhost", "127.0.0.1"].includes(redirect.hostname) || !redirect.port || redirect.pathname !== "/api/tiktok/callback") {
+    throw new Error("Desktop TikTok connection needs a registered HTTP localhost callback URI with a port.");
+  }
+  if (tiktokCallbackServer && tiktokCallbackOrigin === redirect.origin) return;
+  if (tiktokCallbackServer) {
+    await new Promise((resolve) => tiktokCallbackServer.close(resolve));
+    tiktokCallbackServer = undefined;
+  }
+  const callbackServer = createHttpServer(async (request, response) => {
+    const incoming = new URL(request.url || "/", redirect.origin);
+    if (request.method !== "GET" || incoming.pathname !== redirect.pathname) {
+      response.writeHead(404).end();
+      return;
+    }
+    try {
+      const result = await fetch(`${serverUrl}${incoming.pathname}${incoming.search}`, { redirect: "manual" });
+      const location = result.headers.get("location");
+      const destination = location && new URL(location, serverUrl);
+      if (!destination || destination.origin !== serverUrl || destination.pathname !== "/accounts") throw new Error("Unexpected TikTok callback response.");
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      response.end(`<!doctype html><html><head><title>Return to SlideFarm</title></head><body><p>TikTok connection finished. <a href="${deepLink}">Return to SlideFarm</a>.</p><script>location.replace(${JSON.stringify(deepLink)});</script></body></html>`);
+      if (window && !window.isDestroyed()) {
+        void window.loadURL(destination.toString()).catch((error) => log.error(error));
+        window.show();
+        window.focus();
+      }
+    } catch (error) {
+      log.error(error);
+      if (!response.headersSent) {
+        response.writeHead(502, { "Content-Type": "text/plain; charset=utf-8" });
+        response.end("Could not complete TikTok connection. Return to SlideFarm and try again.");
+      }
+    }
+  });
+  await new Promise((resolve, reject) => {
+    callbackServer.once("error", reject);
+    callbackServer.listen(Number(redirect.port), redirect.hostname, resolve);
+  });
+  tiktokCallbackServer = callbackServer;
+  tiktokCallbackOrigin = redirect.origin;
+}
+
+if (hasInstanceLock) app
   .whenReady()
   .then(() => {
     if (process.platform === "darwin") app.dock.setIcon(iconPath);
@@ -144,6 +213,15 @@ app
       (event) => ownWindow(event)?.isMaximized() ?? false,
     );
     ipcMain.handle("window:close", (event) => ownWindow(event)?.close());
+    ipcMain.handle("tiktok:connect", async (event) => {
+      if (!ownWindow(event) || !serverUrl) throw new Error("SlideFarm is not ready.");
+      const response = await fetch(`${serverUrl}/api/tiktok/connect?desktop=1`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not start TikTok connection. Check Settings.");
+      if (!result.authorizationUrl || !result.redirectUri) throw new Error("Complete TikTok Login Kit settings first.");
+      await listenForTikTokCallback(result.redirectUri);
+      await shell.openExternal(result.authorizationUrl);
+    });
     return start();
   })
   .catch((error) => {
@@ -159,5 +237,6 @@ app.on("activate", () => {
     void (serverUrl ? createWindow(serverUrl) : start());
 });
 app.on("before-quit", () => {
+  if (tiktokCallbackServer) tiktokCallbackServer.close();
   if (server && server.exitCode === null) server.kill();
 });

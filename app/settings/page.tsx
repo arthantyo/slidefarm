@@ -17,9 +17,12 @@ export default function SettingsPage() {
   const [effectiveModel, setEffectiveModel] = useState('');
   const [imageModelMessage, setImageModelMessage] = useState('');
   const [savingImageModel, setSavingImageModel] = useState(false);
-  const [pinterest, setPinterest] = useState({ key: '', hasKey: false, host: '', searchPath: '', boardPath: '' });
+  const [pinterest, setPinterest] = useState({ token: '', hasToken: false });
   const [pinterestMessage, setPinterestMessage] = useState('');
   const [savingPinterest, setSavingPinterest] = useState(false);
+  const [tiktok, setTikTok] = useState({ clientKey: '', clientSecret: '', hasSecret: false, redirectUri: '' });
+  const [tiktokMessage, setTikTokMessage] = useState('');
+  const [savingTikTok, setSavingTikTok] = useState(false);
 
   useEffect(() => { setSaved(Boolean(getUserApiKey())); }, []);
   useEffect(() => {
@@ -37,15 +40,34 @@ export default function SettingsPage() {
       .then((result) => setPinterest((current) => ({ ...current, ...result })))
       .catch((error) => setPinterestMessage(error instanceof Error ? error.message : 'Could not load Pinterest settings.'));
   }, []);
+  useEffect(() => {
+    void fetch('/api/settings/tiktok', { cache: 'no-store' })
+      .then(async (response) => { const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Could not load TikTok settings.'); return result; })
+      .then((result) => setTikTok((current) => ({ ...current, ...result })))
+      .catch((error) => setTikTokMessage(error instanceof Error ? error.message : 'Could not load TikTok settings.'));
+  }, []);
 
-  async function savePinterest(removeKey = false) {
+  async function saveTikTok(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSavingTikTok(true); setTikTokMessage('');
+    try {
+      const response = await fetch('/api/settings/tiktok', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tiktok) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not save TikTok settings.');
+      setTikTok({ ...result, clientSecret: '' });
+      setTikTokMessage('TikTok settings saved.');
+    } catch (error) { setTikTokMessage(error instanceof Error ? error.message : 'Could not save TikTok settings.'); }
+    finally { setSavingTikTok(false); }
+  }
+
+  async function savePinterest(removeToken = false) {
     setSavingPinterest(true); setPinterestMessage('');
     try {
-      const response = await fetch('/api/settings/pinterest', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...pinterest, removeKey }) });
+      const response = await fetch('/api/settings/pinterest', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...pinterest, removeToken }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Could not save Pinterest settings.');
-      setPinterest({ ...result, key: '' });
-      setPinterestMessage(removeKey ? 'RapidAPI key removed.' : 'Pinterest settings saved.');
+      setPinterest({ ...result, token: '' });
+      setPinterestMessage(removeToken ? 'Apify token removed.' : 'Pinterest settings saved.');
     } catch (error) { setPinterestMessage(error instanceof Error ? error.message : 'Could not save Pinterest settings.'); }
     finally { setSavingPinterest(false); }
   }
@@ -110,20 +132,29 @@ export default function SettingsPage() {
       {imageModelMessage && <p role="status" className="mt-3 text-sm">{imageModelMessage}</p>}
     </section>
     <section className="mt-6 rounded-xl border border-border bg-card p-6">
+      <h2 className="text-xl font-semibold">TikTok Login Kit</h2>
+      <p className="mt-2 text-sm text-muted-foreground">Enter your TikTok app client key, client secret, and registered redirect URI to connect accounts. These settings are saved on the local server.</p>
+      <form onSubmit={saveTikTok} className="mt-5 space-y-3">
+        <Label htmlFor="tiktok-client-key">Client key</Label>
+        <Input id="tiktok-client-key" spellCheck={false} autoComplete="off" value={tiktok.clientKey} onChange={(event) => setTikTok({ ...tiktok, clientKey: event.target.value })} />
+        <Label htmlFor="tiktok-client-secret">Client secret</Label>
+        <Input id="tiktok-client-secret" type="password" spellCheck={false} autoComplete="off" value={tiktok.clientSecret} onChange={(event) => setTikTok({ ...tiktok, clientSecret: event.target.value })} placeholder={tiktok.hasSecret ? 'Secret saved - enter a new one to replace it' : 'Enter your client secret'} />
+        <p className="text-xs text-muted-foreground">Status: {tiktok.hasSecret ? 'Secret saved' : 'No secret saved'}</p>
+        <Label htmlFor="tiktok-redirect-uri">Redirect URI</Label>
+        <Input id="tiktok-redirect-uri" type="url" spellCheck={false} value={tiktok.redirectUri} onChange={(event) => setTikTok({ ...tiktok, redirectUri: event.target.value })} placeholder="https://your-domain.example/api/tiktok/callback" />
+        <p className="text-xs text-muted-foreground">Use the exact URI registered in your TikTok developer app. Localhost redirects may use an HTTP URL with a port.</p>
+        <Button type="submit" disabled={savingTikTok}>{savingTikTok ? 'Saving.' : 'Save TikTok settings'}</Button>
+      </form>
+      {tiktokMessage && <p role="status" className="mt-3 text-sm">{tiktokMessage}</p>}
+    </section>
+    <section className="mt-6 rounded-xl border border-border bg-card p-6">
       <h2 className="text-xl font-semibold">Pinterest import</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Connect a Pinterest provider from RapidAPI to search pins and import board images. Your key is saved on this device and used by the local server.</p>
+      <p className="mt-2 text-sm text-muted-foreground">Use Apify&apos;s epctex/pinterest-scraper Actor to search pins and import board images. Your API token is saved on the local server.</p>
       <form onSubmit={(event) => { event.preventDefault(); void savePinterest(); }} className="mt-5 space-y-3">
-        <Label htmlFor="pinterest-key">RapidAPI key</Label>
-        <Input id="pinterest-key" type="password" autoComplete="off" spellCheck={false} value={pinterest.key} onChange={(event) => setPinterest({ ...pinterest, key: event.target.value })} placeholder={pinterest.hasKey ? 'Key saved — enter a new key to replace it' : 'Enter your RapidAPI key'} />
-        <p className="text-xs text-muted-foreground">Status: {pinterest.hasKey ? 'Key saved' : 'No key saved'}</p>
-        <Label htmlFor="pinterest-host">RapidAPI host</Label>
-        <Input id="pinterest-host" spellCheck={false} value={pinterest.host} onChange={(event) => setPinterest({ ...pinterest, host: event.target.value })} placeholder="provider.p.rapidapi.com" />
-        <Label htmlFor="pinterest-search-path">Pin search endpoint path</Label>
-        <Input id="pinterest-search-path" spellCheck={false} value={pinterest.searchPath} onChange={(event) => setPinterest({ ...pinterest, searchPath: event.target.value })} placeholder="/search" />
-        <Label htmlFor="pinterest-board-path">Board endpoint path</Label>
-        <Input id="pinterest-board-path" spellCheck={false} value={pinterest.boardPath} onChange={(event) => setPinterest({ ...pinterest, boardPath: event.target.value })} placeholder="/board" />
-        <p className="text-xs text-muted-foreground">The search endpoint receives a <code>query</code> parameter; the board endpoint receives a <code>url</code> parameter. Choose a RapidAPI provider that supports both.</p>
-        <div className="flex gap-2"><Button type="submit" disabled={savingPinterest || (!pinterest.key && !pinterest.hasKey)}>Save Pinterest settings</Button>{pinterest.hasKey && <Button type="button" variant="outline" disabled={savingPinterest} onClick={() => void savePinterest(true)}>Remove key</Button>}</div>
+        <Label htmlFor="pinterest-token">Apify API token</Label>
+        <Input id="pinterest-token" type="password" autoComplete="off" spellCheck={false} value={pinterest.token} onChange={(event) => setPinterest({ ...pinterest, token: event.target.value })} placeholder={pinterest.hasToken ? 'Token saved - enter a new token to replace it' : 'Enter your Apify API token'} />
+        <p className="text-xs text-muted-foreground">Status: {pinterest.hasToken ? 'Token saved' : 'No token saved'}</p>
+        <div className="flex gap-2"><Button type="submit" disabled={savingPinterest || (!pinterest.token && !pinterest.hasToken)}>Save Pinterest settings</Button>{pinterest.hasToken && <Button type="button" variant="outline" disabled={savingPinterest} onClick={() => void savePinterest(true)}>Remove token</Button>}</div>
       </form>
       {pinterestMessage && <p role="status" className="mt-3 text-sm">{pinterestMessage}</p>}
     </section>
