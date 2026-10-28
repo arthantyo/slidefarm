@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Workflow, Users, Settings, Images } from "lucide-react";
-import icon from "@/app/assets/icon.png";
 import { WindowControls } from "@/components/window-controls";
 
 const routes = [
@@ -22,7 +21,7 @@ export function DashboardHeader() {
     <header className="app-titlebar fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-background px-4">
       <div className="flex items-center gap-2.5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Image src={icon} height={32} width={32} alt="SlideFarm" className="pointer-events-none" />
+          <Image src="/assets/icon.png" height={32} width={32} alt="SlideFarm" className="pointer-events-none" />
         </div>
         <span className="font-semibold">SlideFarm</span>
       </div>

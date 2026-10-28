@@ -20,10 +20,10 @@ jobs:
     name: TypeScript and lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - run: npm ci
       - run: npm run typecheck
@@ -36,8 +36,8 @@ jobs:
     name: Go ingest checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: ingest/go.mod
           cache: false
@@ -71,10 +71,10 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - run: npm ci
       - run: npm ci --prefix electron
@@ -82,7 +82,7 @@ jobs:
       - run: npm run test:integration
       - name: Build installer
         run: npx electron-builder --${{ matrix.platform }} ${{ matrix.target }} --x64 --publish never
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: slidefarm-${{ matrix.artifact }}-x64
           if-no-files-found: error
@@ -99,7 +99,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: slidefarm-*-x64
           path: release-assets
