@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test:integration": "node scripts/integration-test.mjs",
     "desktop": "npm run desktop:setup && electron .",
     "desktop:build": "npm run build && npm run desktop:setup && electron-builder",
     "desktop:setup": "npm ci --prefix electron"
@@ -17,6 +18,13 @@
     "@hookform/resolvers": "^3.9.0",
     "@netlify/plugin-nextjs": "^5.15.1",
     "@next/swc-wasm-nodejs": "13.5.1",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-metrics-otlp-proto": "^0.212.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.212.0",
+    "@opentelemetry/resources": "^2.12.0",
+    "@opentelemetry/sdk-metrics": "^2.12.0",
+    "@opentelemetry/sdk-trace-base": "^2.12.0",
+    "@opentelemetry/sdk-trace-node": "^2.12.0",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
     "@radix-ui/react-aspect-ratio": "^1.1.0",
@@ -91,7 +99,14 @@
   "build": {
     "appId": "com.slidefarm.desktop",
     "productName": "SlideFarm",
-    "protocols": [{ "name": "SlideFarm", "schemes": ["slidefarm"] }],
+    "protocols": [
+      {
+        "name": "SlideFarm",
+        "schemes": [
+          "slidefarm"
+        ]
+      }
+    ],
     "directories": {
       "output": "dist",
       "app": "electron"

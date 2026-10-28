@@ -1,6 +1,7 @@
 'use client';
 
 import { aiRequestHeaders } from '@/lib/ai/user-key';
+import { trackEvent } from '@/lib/analytics/events';
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -183,6 +184,7 @@ export function GeneratorDialog({ open, onOpenChange, remixProject, onRemixPendi
       if (!await useProjectStore.getState().save(project)) {
         throw new Error('Could not save the generated project locally');
       }
+      trackEvent('ai_generation_completed');
       loadProject(project);
 
       setGenerationProgress({ stage: 'Done', current: 6, total: 6 });

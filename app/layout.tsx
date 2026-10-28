@@ -5,6 +5,7 @@ import "@fontsource/open-runde/500.css";
 import "@fontsource/open-runde/600.css";
 import "@fontsource/open-runde/700.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { PageTracker } from "@/components/analytics/page-tracker";
 
 export const metadata: Metadata = {
   title: "Slidefarm: AI Social Media Marketing",
@@ -25,6 +26,7 @@ export default function RootLayout({
           defaultTheme="dark"
           enableSystem={false}
         >
+          <PageTracker />
           {children}
         </ThemeProvider>
       </body>

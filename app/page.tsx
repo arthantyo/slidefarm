@@ -7,6 +7,8 @@ import { useProjectStore } from "@/stores/project-store";
 import { useEditorStore } from "@/stores/editor-store";
 import { useCustomTemplateStore } from "@/stores/custom-template-store";
 import { createBlankProject } from "@/lib/canvas/templates";
+import { trackEvent } from "@/lib/analytics/events";
+import { useDesktopInteractive } from "@/components/analytics/use-desktop-interactive";
 import {
   fillTemplateFromData,
   loadTemplateCollectionImages,
@@ -68,6 +70,7 @@ export default function DashboardPage() {
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  useDesktopInteractive('dashboard', loaded);
 
   useEffect(() => {
     load();
@@ -175,6 +178,7 @@ export default function DashboardPage() {
   const handleCreateBlank = async () => {
     const project = createBlankProject("Untitled Project");
     if (!(await useProjectStore.getState().save(project))) return;
+    trackEvent('project_created', { source: 'blank' });
     loadProject(project);
     router.push(`/editor/${project.id}`);
   };
@@ -196,6 +200,7 @@ export default function DashboardPage() {
     const collectionImages = await loadTemplateCollectionImages(template);
     const project = fillTemplateFromData(template, {}, template.name, collectionImages);
     if (!(await useProjectStore.getState().save(project))) return;
+    trackEvent('project_created', { source: 'template' });
     loadProject(project);
     router.push(`/editor/${project.id}`);
   };
@@ -296,6 +301,7 @@ export default function DashboardPage() {
                   collectionImages,
                 );
                 if (!(await useProjectStore.getState().save(project))) return;
+                trackEvent('project_created', { source: 'template' });
                 loadProject(project);
                 router.push(`/editor/${project.id}`);
               }}

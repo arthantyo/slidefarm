@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import type { ExportFormat } from "@/lib/export";
 import { exportProject, downloadBlob, sanitizeFilename } from "@/lib/export";
+import { trackEvent } from "@/lib/analytics/events";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -161,6 +162,7 @@ export function EditorTopBar({ onOpenGenerator }: EditorTopBarProps) {
               ? `${sanitizeFilename(project.name)}.json`
               : `${sanitizeFilename(project.name)}-slide-1.${ext}`;
       downloadBlob(blob, filename);
+      trackEvent('project_exported', { format });
     } catch (err) {
       console.error("Export failed:", err);
     } finally {

@@ -71,6 +71,45 @@ The key is stored in the local Electron profile and sent to SlideFarm's local se
 
 For server-side configuration, copy `.env.example` to `.env` and fill in only the values you need. Never commit real credentials. The example also lists optional model settings, TikTok, Cloudflare R2, and Pinterest variables.
 
+## OpenTelemetry analytics (optional)
+
+The Go service in [`ingest/`](ingest/) receives SlideFarm's OTLP/HTTP metrics and traces and forwards them to Grafana Cloud. On that server, set the values from your Grafana Cloud stack's **OpenTelemetry** tile:
+
+```dotenv
+GRAFANA_CLOUD_OTLP_ENDPOINT=https://your-stack-otlp-gateway.example/otlp
+GRAFANA_CLOUD_INSTANCE_ID=your-instance-id
+GRAFANA_CLOUD_TOKEN=your-access-policy-token
+INGEST_LISTEN_ADDR=127.0.0.1:4318
+INGEST_API_KEY=your-ingest-key
+```
+
+From `ingest/`, run `go run .` with those variables in its process environment, or build the included Dockerfile. The Grafana endpoint is the base URL ending in `/otlp`; the service appends `/v1/metrics` and `/v1/traces` and authenticates with the instance ID and token. It listens on localhost by default. If deployed behind an HTTPS reverse proxy, set `INGEST_LISTEN_ADDR` for that interface and require `INGEST_API_KEY`.
+
+Point the SlideFarm server at the ingest service:
+
+```dotenv
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
+OTEL_EXPORTER_OTLP_HEADERS=X-SlideFarm-Ingest-Key=your-ingest-key
+OTEL_SERVICE_NAME=slidefarm
+```
+
+Use your HTTPS ingest URL when the Go service runs on another machine. Grafana credentials stay on the Go server; the ingest key is separate. Packaged desktop builds exclude `.env`, so provide the SlideFarm variables when launching the app. Never put either credential in `NEXT_PUBLIC_*` variables or commit them.
+
+The server exports Next.js traces, a `slidefarm.user_actions` counter, and a `slidefarm.desktop.startup.duration` histogram. The counter records page views, completed project creation, completed AI generation, and successful editor exports. Startup measurements use Electron's monotonic clock from main-process entry to `app_ready`, `window_loaded`, `dashboard_interactive`, and the first `editor_interactive` milestone. The dashboard milestone measures launch to a usable home screen. The editor milestone includes any time spent choosing a project on the dashboard. Metric attributes contain only bounded categories and milestone names; project IDs, content, prompts, and account details are not included. Without an OTLP endpoint, export is disabled.
+
+Each milestone's exact elapsed time is also written to the Electron log. In Grafana Explore, the 24-hour average launch-to-dashboard time in milliseconds is:
+
+```promql
+sum(increase(slidefarm_desktop_startup_duration_milliseconds_sum{startup_milestone="dashboard_interactive"}[24h]))
+/
+sum(increase(slidefarm_desktop_startup_duration_milliseconds_count{startup_milestone="dashboard_interactive"}[24h]))
+```
+
+Change the milestone label to `editor_interactive` to measure total elapsed time until the first editor is usable. Grafana converts dots in OTLP metric and attribute names to underscores for Prometheus queries.
+
+An OTLP collector or compatible backend is needed to store and view the data. The app does not include an analytics dashboard.
+
 ## Local data
 
 Projects and folders are stored in `projects.json` in SlideFarm's local app data directory: `%APPDATA%\SlideFarm` on Windows, `~/Library/Application Support/SlideFarm` on macOS, or `$XDG_DATA_HOME/SlideFarm` (usually `~/.local/share/SlideFarm`) on Linux. Set `SLIDEFARM_DATA_DIR` to use a different directory. Electron sets it to its user data directory when launching the server. The first local load migrates projects and folders from older browser storage.
@@ -100,7 +139,7 @@ Each connected profile has its own calendar. Scheduling exports the slides to R2
 
 ## Status
 
-SlideFarm is an early-stage project. The desktop app, canvas editor, custom templates, and export formats above are implemented. The template gallery currently has no bundled starter templates. TikTok posting targets the developer sandbox and depends on a running local server for scheduled posts. There are no prebuilt downloads documented here; build an installer from source with `npm run desktop:build`.
+SlideFarm is an early-stage project. The desktop app, canvas editor, custom templates, and export formats above are implemented. The template gallery currently has no bundled starter templates. TikTok posting targets the developer sandbox and depends on a running local server for scheduled posts. Tagged releases include desktop installers on GitHub Releases; you can also build one from source with `npm run desktop:build`.
 
 ## Development
 
@@ -108,9 +147,16 @@ SlideFarm is an early-stage project. The desktop app, canvas editor, custom temp
 npm run typecheck
 npm run lint
 npm run build
+npm run test:integration
 ```
 
 `npm run desktop:build` creates a production build and a platform installer in `dist/`.
+
+### Desktop CI and releases
+
+The [desktop workflow](.github/workflows/desktop-release.yml) checks TypeScript and lint, then builds the Next.js standalone server, runs HTTP integration checks, and packages Windows x64 (NSIS), macOS Intel (DMG), and Linux x64 (AppImage) on their native runners. Pull requests and pushes to `main` produce downloadable Actions artifacts. Push a tag matching the version in both `package.json` and `electron/package.json` (for example, `v0.1.0`) to publish those installers and a `SHA256SUMS.txt` file to GitHub Releases. The repository's Actions settings must allow the workflow's `GITHUB_TOKEN` to create releases.
+
+These packages are unsigned. Windows SmartScreen and macOS Gatekeeper may warn when opening them; signing and notarization require platform credentials and are not configured.
 
 ### Architecture
 

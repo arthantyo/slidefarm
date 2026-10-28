@@ -13,6 +13,7 @@ import { LeftSidebar } from '@/components/editor/left-sidebar';
 import { RightSidebar } from '@/components/editor/right-sidebar';
 import { BottomSlideBar } from '@/components/editor/bottom-slide-bar';
 import { CanvasStage } from '@/components/editor/canvas-stage-wrapper';
+import { useDesktopInteractive } from '@/components/analytics/use-desktop-interactive';
 import { GeneratorDialog } from '@/components/generator/generator-dialog';
 import { Loader2 } from 'lucide-react';
 
@@ -25,6 +26,7 @@ export default function EditorPage() {
   const loaded = useProjectStore((s) => s.loaded);
   const [generatorOpen, setGeneratorOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  useDesktopInteractive('editor', !isLoading && Boolean(project?.slides.length));
   const hydratedTemplateRef = useRef<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const internalCopyRef = useRef(false);

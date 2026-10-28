@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import type { BackgroundElement } from '@/types';
 import type { ImageLibrary } from '@/lib/server/image-library';
 import { Label } from '@/components/ui/label';
@@ -55,7 +56,7 @@ export function BackgroundProperties({
           <SelectContent><SelectItem value="fixed">Fixed image</SelectItem>{library.folders.map((folder) => <SelectItem key={folder.id} value={folder.id}>{folder.name} ({library.images.filter((image) => image.folderId === folder.id).length})</SelectItem>)}</SelectContent>
         </Select>
         {element.imageCollectionId && <p className="text-xs text-muted-foreground">A random image from this collection is chosen for this slide when a project is generated from the template.</p>}
-        <div className="grid grid-cols-3 gap-1.5">{library.images.filter((image) => !element.imageCollectionId || image.folderId === element.imageCollectionId).map((image) => <button key={image.id} type="button" title={image.name} aria-label={`Set ${image.name} as slide background`} onClick={() => onUpdate({ imageSrc: image.src })} className={`overflow-hidden rounded border-2 ${element.imageSrc === image.src ? 'border-primary' : 'border-transparent'}`}><img src={image.src} alt="" className="aspect-square w-full object-cover" /></button>)}</div>
+        <div className="grid grid-cols-3 gap-1.5">{library.images.filter((image) => !element.imageCollectionId || image.folderId === element.imageCollectionId).map((image) => <button key={image.id} type="button" title={image.name} aria-label={`Set ${image.name} as slide background`} onClick={() => onUpdate({ imageSrc: image.src })} className={`overflow-hidden rounded border-2 ${element.imageSrc === image.src ? 'border-primary' : 'border-transparent'}`}><Image src={image.src} alt="" width={120} height={120} unoptimized className="aspect-square w-full object-cover" /></button>)}</div>
         {!library.images.length && <p className="text-xs text-muted-foreground">Add images in the Images section first.</p>}
         {element.imageSrc && <Button size="sm" variant="outline" onClick={() => onUpdate({ imageSrc: undefined })}>Clear image</Button>}
       </div>}

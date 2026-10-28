@@ -1,3 +1,4 @@
+const startupStarted = process.hrtime.bigint();
 const { app, BrowserWindow, Menu, ipcMain, shell } = require("electron");
 const { spawn } = require("node:child_process");
 const { createServer: createNetServer } = require("node:net");
@@ -12,6 +13,38 @@ let window;
 let serverUrl;
 let tiktokCallbackServer;
 let tiktokCallbackOrigin;
+const startupMilestones = new Set();
+const pendingStartup = [];
+let sendingStartup = false;
+
+function recordStartup(milestone) {
+  if (startupMilestones.has(milestone)) return;
+  startupMilestones.add(milestone);
+  const durationMs = Number(process.hrtime.bigint() - startupStarted) / 1e6;
+  log.info("Startup milestone", milestone, `${durationMs.toFixed(1)} ms`);
+  pendingStartup.push({ milestone, durationMs });
+  void flushStartup();
+}
+
+async function flushStartup() {
+  if (!serverUrl || sendingStartup) return;
+  sendingStartup = true;
+  try {
+    while (pendingStartup.length) {
+      const response = await fetch(`${serverUrl}/api/desktop-startup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pendingStartup[0]),
+      });
+      if (!response.ok) throw new Error(`Startup telemetry returned ${response.status}`);
+      pendingStartup.shift();
+    }
+  } catch (error) {
+    log.warn("Could not report startup timing", error);
+  } finally {
+    sendingStartup = false;
+  }
+}
 const deepLink = "slidefarm://tiktok-connected";
 if (process.defaultApp && process.argv.length >= 2) {
   app.setAsDefaultProtocolClient("slidefarm", process.execPath, [path.resolve(process.argv[1])]);
@@ -99,6 +132,7 @@ async function start() {
   const url = `http://127.0.0.1:${port}`;
   await waitForServer(url, server);
   serverUrl = url;
+  void flushStartup();
   await createWindow(url);
 }
 
@@ -127,6 +161,7 @@ async function createWindow(url) {
   window.on("maximize", notifyMaximized);
   window.on("unmaximize", notifyMaximized);
   window.once("ready-to-show", () => window.show());
+  window.webContents.once("did-finish-load", () => recordStartup("window_loaded"));
   const isLocal = (target) => {
     try {
       return new URL(target).origin === url;
@@ -194,6 +229,7 @@ async function listenForTikTokCallback(redirectUri) {
 if (hasInstanceLock) app
   .whenReady()
   .then(() => {
+    recordStartup("app_ready");
     if (process.platform === "darwin") app.dock.setIcon(iconPath);
     Menu.setApplicationMenu(null);
     const ownWindow = (event) => {
@@ -213,6 +249,10 @@ if (hasInstanceLock) app
       (event) => ownWindow(event)?.isMaximized() ?? false,
     );
     ipcMain.handle("window:close", (event) => ownWindow(event)?.close());
+    ipcMain.handle("startup:interactive", (event, stage) => {
+      if (!ownWindow(event) || (stage !== "dashboard" && stage !== "editor")) return;
+      recordStartup(stage === "dashboard" ? "dashboard_interactive" : "editor_interactive");
+    });
     ipcMain.handle("tiktok:connect", async (event) => {
       if (!ownWindow(event) || !serverUrl) throw new Error("SlideFarm is not ready.");
       const response = await fetch(`${serverUrl}/api/tiktok/connect?desktop=1`);

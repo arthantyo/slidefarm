@@ -8,6 +8,7 @@ declare global {
       isMaximized: () => Promise<boolean>;
       close: () => Promise<void>;
       connectTikTok: () => Promise<void>;
+      markInteractive: (stage: 'dashboard' | 'editor') => Promise<void>;
       onMaximizedChange: (callback: (maximized: boolean) => void) => () => void;
     };
   }
