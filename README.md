@@ -11,6 +11,7 @@
   <a href="#workflows">Workflows</a> ·
   <a href="#export">Export</a> ·
   <a href="#get-started">Get started</a> ·
+  <a href="#settings">Settings</a> ·
   <a href="#status">Status</a> ·
   <a href="#development">Development</a>
 </p>
@@ -24,8 +25,9 @@ SlideFarm runs as an Electron app with a local Next.js server. You can create sl
 <p align="center"><img src="images/edit-preview.png" alt="SlideFarm editor showing a portrait slide, text controls, and slide thumbnails" width="100%"></p>
 
 - **Start your way.** Create a blank project, generate slides with AI, or reuse a template you saved from an earlier project. The template gallery has no bundled starter templates yet.
-- **Work on a canvas.** Add and arrange slide elements in the editor, manage multiple slides, and organize projects into folders.
-- **Reuse layouts.** Save a project as a custom template and fill its text and image placeholders with new content.
+- **Work on a canvas.** Add and arrange slide elements in the editor, manage multiple slides, and organize projects into folders. Recent Projects can switch between a card grid and a list.
+- **Keep an image library.** Upload PNG, JPEG, or WebP images, group them in folders, and import pins from a Pinterest search or board link. Use those images from the editor or as a slide background.
+- **Reuse layouts.** Save a project as a custom template and fill its text and image placeholders with new content. Editing a saved template updates that template.
 
 ## Workflows
 
@@ -65,11 +67,13 @@ Open `http://localhost:3000`. Local file-backed features use the machine running
 
 ## AI setup (optional)
 
-SlideFarm uses an OpenAI API key for slide generation, remixing, image generation, rewriting, and captions. Create a key in the [OpenAI API dashboard](https://platform.openai.com/api-keys), then open **Settings** in SlideFarm, enter it under **OpenAI API key**, and select **Save key**. API usage is billed separately from ChatGPT. Saving a key does not validate it; if a request fails, check the key and API billing.
+SlideFarm uses an OpenAI API key for slide generation, remixing, image generation, rewriting, and captions. Create a key in the [OpenAI API dashboard](https://platform.openai.com/api-keys), then open **Settings**, choose **OpenAI**, enter the key, and select **Save key**. API usage is billed separately from ChatGPT. Saving a key does not validate it; if a request fails, check the key and API billing.
 
-The key is stored in the local Electron profile and sent to SlideFarm's local server for AI requests. Anyone with access to that profile can use it. Select **Remove key** in Settings to clear it. Workflow jobs currently use the server's `OPENAI_API_KEY` environment variable instead of the key saved in Settings.
+The key stays in this device's app storage and is sent to SlideFarm's local server for AI requests. Anyone with access to that profile can use it. Select **Remove key** in Settings to clear it. Workflow jobs currently use the server's `OPENAI_API_KEY` environment variable instead of the key saved in Settings.
 
-For server-side configuration, copy `.env.example` to `.env` and fill in only the values you need. Never commit real credentials. The example also lists optional model settings, TikTok, Cloudflare R2, and Pinterest variables.
+**Image model** chooses the OpenAI image model for new images, remixes, and workflow image generation. Leave the field blank to use `OPENAI_IMAGE_MODEL`, or `gpt-image-1-mini` when that variable is unset.
+
+For server-side configuration, copy `.env.example` to `.env` and fill in only the values you need. Never commit real credentials. The example lists optional model settings, TikTok, Cloudflare R2, and OpenTelemetry variables. Pinterest import uses the Apify token saved in Settings, or the `APIFY_TOKEN` environment variable when no token is saved.
 
 ## OpenTelemetry analytics (optional)
 
@@ -114,11 +118,25 @@ An OTLP collector or compatible backend is needed to store and view the data. Th
 
 Projects and folders are stored in `projects.json` in SlideFarm's local app data directory: `%APPDATA%\SlideFarm` on Windows, `~/Library/Application Support/SlideFarm` on macOS, or `$XDG_DATA_HOME/SlideFarm` (usually `~/.local/share/SlideFarm`) on Linux. Set `SLIDEFARM_DATA_DIR` to use a different directory. Electron sets it to its user data directory when launching the server. The first local load migrates projects and folders from older browser storage.
 
-Back up the local data directory if you need to preserve projects, templates, or connected account data. The desktop server listens on `127.0.0.1` on an available port; file and account endpoints accept localhost requests.
+Back up the local data directory if you need to preserve projects, templates, the image library, settings, or connected account data. The desktop server listens on `127.0.0.1` on an available port; file and account endpoints accept localhost requests.
+
+## Settings
+
+Settings has its own section list. Appearance is the default. On a narrow window the list sits across the top.
+
+| Section | What it controls |
+| --- | --- |
+| Appearance | Light or dark theme on this device |
+| OpenAI | The API key described above |
+| Image model | The OpenAI image model, saved on the local server |
+| TikTok | Client key, client secret, and redirect URI, saved on the local server |
+| Pinterest | Apify API token for the `epctex/pinterest-scraper` Actor, saved on the local server |
+
+Saved TikTok and Pinterest values are used when present. Otherwise SlideFarm reads the matching environment variables. An unknown settings section opens Appearance.
 
 ## TikTok sandbox (optional)
 
-In your TikTok Developer sandbox, enable Login Kit and Content Posting API, allow `user.info.basic` and `video.publish`, and register the exact callback URL. Configure these server variables in `.env`:
+In your TikTok Developer sandbox, enable Login Kit and Content Posting API, allow `user.info.basic` and `video.publish`, and register the exact callback URL. Save the client key, client secret, and that redirect URI under **Settings → TikTok**, or configure these server variables in `.env`:
 
 ```dotenv
 TIKTOK_CLIENT_KEY=your-sandbox-client-key
@@ -139,7 +157,7 @@ Each connected profile has its own calendar. Scheduling exports the slides to R2
 
 ## Status
 
-SlideFarm is an early-stage project. The desktop app, canvas editor, custom templates, and export formats above are implemented. The template gallery currently has no bundled starter templates. TikTok posting targets the developer sandbox and depends on a running local server for scheduled posts. Tagged releases include desktop installers on GitHub Releases; you can also build one from source with `npm run desktop:build`.
+SlideFarm is an early-stage project. The desktop app, canvas editor, image library, custom templates, settings, and export formats above are implemented. The template gallery currently has no bundled starter templates. TikTok posting targets the developer sandbox and depends on a running local server for scheduled posts. Tagged releases include desktop installers on GitHub Releases; you can also build one from source with `npm run desktop:build`.
 
 ## Development
 
@@ -175,4 +193,4 @@ See [AGENTS.md](AGENTS.md) for repository working practices. Issues and pull req
 
 ## License
 
-This repository does not currently include a license file. An explicit license is needed before others can reuse or redistribute the code under open source terms.
+SlideFarm is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). Copyright © 2026 Arthantyo Nirwansyah. You may use, change, and share this software for noncommercial purposes. See `LICENSE` for the full terms.
