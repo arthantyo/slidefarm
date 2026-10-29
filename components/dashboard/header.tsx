@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Workflow, Users, Settings, Images } from "lucide-react";
+import { LayoutDashboard, Workflow, Users, Settings, Images, ScrollText } from "lucide-react";
 import { WindowControls } from "@/components/window-controls";
 
 const routes = [
@@ -11,6 +11,7 @@ const routes = [
   { href: "/images", label: "Images", icon: Images },
   { href: "/workflows", label: "Workflows", icon: Workflow },
   { href: "/accounts", label: "Accounts", icon: Users },
+  { href: "/logs", label: "Logs", icon: ScrollText },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

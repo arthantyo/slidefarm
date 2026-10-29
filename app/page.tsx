@@ -6,7 +6,6 @@ import type { Project, ProjectFolder } from "@/types";
 import { useProjectStore } from "@/stores/project-store";
 import { useEditorStore } from "@/stores/editor-store";
 import { useCustomTemplateStore } from "@/stores/custom-template-store";
-import { createBlankProject } from "@/lib/canvas/templates";
 import { trackEvent } from "@/lib/analytics/events";
 import { useDesktopInteractive } from "@/components/analytics/use-desktop-interactive";
 import {
@@ -200,12 +199,8 @@ export default function DashboardPage() {
       router.push(`/editor/${projectId}`);
     }
   };
-  const handleCreateBlank = async () => {
-    const project = createBlankProject("Untitled Project");
-    if (!(await useProjectStore.getState().save(project))) return;
-    trackEvent('project_created', { source: 'blank' });
-    loadProject(project);
-    router.push(`/editor/${project.id}`);
+  const handleCreateBlank = () => {
+    router.push('/editor/new');
   };
   const toggleProjectSelected = (id: string) => {
     setSelectedProjectIds((current) =>

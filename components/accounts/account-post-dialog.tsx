@@ -5,7 +5,7 @@ import { SchedulePostForm } from "@/components/accounts/schedule-post-form";
 import { AccountPostDetails } from "@/components/accounts/account-post-details";
 import type { ScheduledPost } from "@/lib/server/tiktok-schedule";
 import type { PostTimes } from "@/lib/server/tiktok-post-settings";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
 type Account = ComponentProps<typeof SchedulePostForm>["account"];
 type Props = {
@@ -36,9 +36,10 @@ type Props = {
   onCancel: (id: string) => Promise<void>;
   onAdd: () => void;
   onSaved: ComponentProps<typeof SchedulePostForm>["onSaved"];
+  formContent?: ReactNode;
 };
 
-export function AccountPostDialog({ dialogOpen, dialogView, day, error, message, formPost, dayPosts, previewPost, busy, postTimesLoaded, canPublish, activeAccount, formKey, projects, folders, setPosted, posts, formTime, formSlot, onOpenChange, onPreview, onBack, onEdit, onRetry, onCancel, onAdd, onSaved }: Props) {
+export function AccountPostDialog({ dialogOpen, dialogView, day, error, message, formPost, dayPosts, previewPost, busy, postTimesLoaded, canPublish, activeAccount, formKey, projects, folders, setPosted, posts, formTime, formSlot, onOpenChange, onPreview, onBack, onEdit, onRetry, onCancel, onAdd, onSaved, formContent }: Props) {
   return (
         <Dialog
           open={dialogOpen}
@@ -106,7 +107,8 @@ export function AccountPostDialog({ dialogOpen, dialogView, day, error, message,
               onCancel={onCancel}
               onAdd={onAdd}
             />
-            {dialogView === "form" && activeAccount && (
+            {dialogView === "form" && formContent}
+            {dialogView === "form" && !formContent && activeAccount && (
               <SchedulePostForm
                 key={formKey}
                 account={activeAccount}

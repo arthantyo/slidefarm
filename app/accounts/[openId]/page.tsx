@@ -9,6 +9,8 @@ import { dateKey, postDate, timeValue } from "@/components/accounts/calendar-uti
 import { AccountPostDialog } from "@/components/accounts/account-post-dialog";
 import { AccountPageHeader } from "@/components/accounts/account-page-header";
 import { SendTikTokDraft } from "@/components/accounts/send-tiktok-draft";
+import { DemoAccountCalendar } from "@/components/accounts/demo-account-calendar";
+import { DEMO_ACCOUNT_ID, demoAccountEnabled } from "@/lib/demo-account";
 import { useAccountBootstrap } from "@/components/accounts/use-account-bootstrap";
 import { loadPosts as fetchPosts } from "@/components/accounts/load-calendar-posts";
 import { useProjectStore } from "@/stores/project-store";
@@ -19,6 +21,22 @@ type Creator = { creator_nickname?: string; privacy_level_options?: string[] };
 
 const defaultPostTimes: PostTimes = ["03:00", "18:00"];
 export default function AccountCalendarPage({
+  params,
+}: {
+  params: { openId: string };
+}) {
+  if (params.openId === DEMO_ACCOUNT_ID) return <DemoAccountGate />;
+  return <ConnectedAccountCalendarPage params={params} />;
+}
+
+function DemoAccountGate() {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => { setEnabled(demoAccountEnabled()); }, []);
+  if (enabled) return <DemoAccountCalendar />;
+  return <DashboardShell><main className="mx-auto max-w-5xl px-6 py-8"><Card className="p-6">This demo account is unavailable. <Link href="/accounts" className="underline">View accounts</Link></Card></main></DashboardShell>;
+}
+
+function ConnectedAccountCalendarPage({
   params,
 }: {
   params: { openId: string };

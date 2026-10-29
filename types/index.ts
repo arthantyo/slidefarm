@@ -73,6 +73,17 @@ export interface ImageElement extends BaseElement {
   imagePrompt?: string;
   objectFit: 'cover' | 'contain' | 'fill';
   cornerRadius: number;
+  /** Optional CSS/canvas image adjustments. Missing values use the unfiltered image. */
+  filters?: {
+    brightness?: number;
+    contrast?: number;
+    saturate?: number;
+    grayscale?: number;
+    sepia?: number;
+    invert?: number;
+    hueRotate?: number;
+    blur?: number;
+  };
   shadow?: {
     color: string;
     blur: number;

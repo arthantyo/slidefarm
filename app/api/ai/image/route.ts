@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { effectiveImageModel } from '@/lib/server/image-model-settings';
 import { describeImageStyle } from '@/lib/ai/image-style';
+import { trackedOpenAiFetch } from '@/lib/server/ai-usage';
 
 export const runtime = 'nodejs';
 
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
       ? await describeImageStyle(`data:${sourceImage.type};base64,${Buffer.from(await sourceImage.arrayBuffer()).toString('base64')}`, apiKey)
       : '';
 
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
+    const response = await trackedOpenAiFetch('Image generation', 'image', 'https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,

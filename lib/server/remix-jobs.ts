@@ -9,6 +9,7 @@ import { describeImageStyle } from '@/lib/ai/image-style';
 import { assembleRemixedProject } from '@/lib/ai/assembly';
 import { dataDirectory, readProjectFile } from './project-files';
 import { effectiveImageModel } from './image-model-settings';
+import { trackedOpenAiFetch } from './ai-usage';
 
 export interface RemixJob {
   id: string;
@@ -60,7 +61,7 @@ async function generateImage(prompt: string, sourceImage: string, width: number,
   const style = await describeImageStyle(sourceImage, apiKey);
   const ratio = width / height;
   const size = ratio > 1.2 ? '1536x1024' : ratio < 0.8 ? '1024x1536' : '1024x1024';
-  const response = await fetch('https://api.openai.com/v1/images/generations', {
+  const response = await trackedOpenAiFetch('Remix image', 'image', 'https://api.openai.com/v1/images/generations', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model, prompt: `Create an image of: ${prompt}\n\nVisual style: ${style}\n\nDepict the remixed subject clearly. Use the style description only for its visual treatment, not its original subject. No text, letters, or watermarks.`, size, quality: 'medium', background: 'auto', output_format: 'webp', n: 1 }),

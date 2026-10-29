@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import type { Project } from '@/types';
 import { useEditorStore } from '@/stores/editor-store';
 import { useProjectStore } from '@/stores/project-store';
+import { createBlankProject } from '@/lib/canvas/templates';
+import { trackEvent } from '@/lib/analytics/events';
 import { useCustomTemplateStore } from '@/stores/custom-template-store';
 import { projectFromTemplate } from '@/lib/canvas/template-filler';
 import { pasteImageFile } from '@/lib/canvas/paste-image';
@@ -15,10 +18,12 @@ import { BottomSlideBar } from '@/components/editor/bottom-slide-bar';
 import { CanvasStage } from '@/components/editor/canvas-stage-wrapper';
 import { useDesktopInteractive } from '@/components/analytics/use-desktop-interactive';
 import { GeneratorDialog } from '@/components/generator/generator-dialog';
+import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 
 export default function EditorPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.projectId as string;
   const { project, currentSlideId, selectedElementIds, zoom, loadProject } = useEditorStore();
   const getProject = useProjectStore((s) => s.get);
@@ -26,6 +31,10 @@ export default function EditorPage() {
   const loaded = useProjectStore((s) => s.loaded);
   const [generatorOpen, setGeneratorOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [creationError, setCreationError] = useState(false);
+  const [creationAttempt, setCreationAttempt] = useState(0);
+  const blankProjectRef = useRef<Project | null>(null);
+  const blankSaveRef = useRef<Promise<boolean> | null>(null);
   useDesktopInteractive('editor', !isLoading && Boolean(project?.slides.length));
   const hydratedTemplateRef = useRef<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -63,12 +72,35 @@ export default function EditorPage() {
       load();
       return;
     }
+    if (projectId === 'new') {
+      const blankProject = blankProjectRef.current ?? createBlankProject('Untitled Project');
+      blankProjectRef.current = blankProject;
+      if (!blankSaveRef.current) {
+        blankSaveRef.current = useProjectStore.getState().save(blankProject).then((saved) => {
+          if (saved) trackEvent('project_created', { source: 'blank' });
+          return saved;
+        });
+      }
+      let cancelled = false;
+      void blankSaveRef.current.then((saved) => {
+        if (cancelled) return;
+        if (saved) {
+          loadProject(blankProject);
+          router.replace(`/editor/${blankProject.id}`);
+          setIsLoading(false);
+        } else {
+          setCreationError(true);
+          setIsLoading(false);
+        }
+      });
+      return () => { cancelled = true; };
+    }
     const found = getProject(projectId);
     if (found) {
       loadProject(found);
     }
     setIsLoading(false);
-  }, [projectId, loaded, load, getProject, loadProject]);
+  }, [projectId, loaded, load, getProject, loadProject, router, creationAttempt]);
 
   // Autosave (debounced)
   useEffect(() => {
@@ -211,6 +243,20 @@ export default function EditorPage() {
       window.removeEventListener('blur', clearInternalCopy);
     };
   }, []);
+
+  if (creationError) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background">
+        <p role="alert" className="text-sm text-destructive">Could not save the new project.</p>
+        <Button onClick={() => {
+          blankSaveRef.current = null;
+          setCreationError(false);
+          setIsLoading(true);
+          setCreationAttempt((attempt) => attempt + 1);
+        }}>Try again</Button>
+      </div>
+    );
+  }
 
   if (isLoading || !project) {
     return (

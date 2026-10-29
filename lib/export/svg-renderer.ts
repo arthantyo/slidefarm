@@ -3,6 +3,7 @@ import { getWrappedLines } from './text-wrap';
 import { renderSlideToCanvas } from './canvas-renderer';
 import { getTextFontWeight, isTextItalic } from '@/lib/canvas/text-style';
 import { elementsInLayerOrder } from '@/lib/canvas/layers';
+import { getImageFilterCss } from '@/lib/canvas/image-filters';
 
 function renderElementToSVG(el: CanvasElement, width: number, height: number): string {
   if (!el.visible) return '';
@@ -68,7 +69,7 @@ function renderElementToSVG(el: CanvasElement, width: number, height: number): s
       ? `<clipPath id="clip-${img.id}"><rect x="${img.x}" y="${img.y}" width="${img.width}" height="${img.height}" rx="${img.cornerRadius}"/></clipPath>`
       : '';
     const clipAttr = img.cornerRadius > 0 ? ` clip-path="url(#clip-${img.id})"` : '';
-    return `${clipPath}<image x="${img.x}" y="${img.y}" width="${img.width}" height="${img.height}" href="${img.src}"${clipAttr}${transform}${opacity} preserveAspectRatio="${img.objectFit === 'cover' ? 'xMidYMid slice' : img.objectFit === 'contain' ? 'xMidYMid meet' : 'none'}"/>`;
+    return `${clipPath}<image x="${img.x}" y="${img.y}" width="${img.width}" height="${img.height}" href="${escapeXML(img.src)}"${clipAttr}${transform}${opacity} style="filter: ${getImageFilterCss(img.filters)}" preserveAspectRatio="${img.objectFit === 'cover' ? 'xMidYMid slice' : img.objectFit === 'contain' ? 'xMidYMid meet' : 'none'}"/>`;
   }
 
   if (el.type === 'shape') {

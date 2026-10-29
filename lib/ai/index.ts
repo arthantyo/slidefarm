@@ -1,6 +1,7 @@
 import type { GenerationOptions, AIPlan, AIPlannedSlide, SlideType, Tone, VisualStyle } from '@/types';
 import { aiPlanSchema } from '@/lib/schemas';
 import { DEFAULT_THEMES } from '@/lib/canvas/themes';
+import { trackedOpenAiFetch } from '@/lib/server/ai-usage';
 
 // ─── Provider Interface ──────────────────────────────────────────────────────
 
@@ -112,12 +113,13 @@ async function callOpenAI(
   messages: Array<{ role: string; content: string }>,
   options: GenerationOptions,
   apiKey = process.env.OPENAI_API_KEY,
+  feature = 'Slide generation',
 ): Promise<string> {
   if (!apiKey) throw new Error('No OPENAI_API_KEY');
 
   const model = options.model || process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await trackedOpenAiFetch(feature, 'text', 'https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -177,7 +179,7 @@ const createOpenAIProvider = (apiKey?: string): AIProvider => ({
     const content = await callOpenAI([
       { role: 'system', content: 'You are a copy editor. Rewrite the given text according to the instruction. Respond with ONLY the rewritten text, no explanation.' },
       { role: 'user', content: `Instruction: ${instruction}\n\nText: ${text}` },
-    ], { prompt: '' }, apiKey);
+    ], { prompt: '' }, apiKey, 'Text rewrite');
 
     return content.trim().replace(/^["']|["']$/g, '');
   },
@@ -187,7 +189,7 @@ const createOpenAIProvider = (apiKey?: string): AIProvider => ({
     const content = await callOpenAI([
       { role: 'system', content: 'You generate image prompts for AI image generation. The image must NOT contain any text or words. Respond with ONLY the prompt.' },
       { role: 'user', content: `Create an image generation prompt for: ${description}. Style: ${styleHint}. No text in the image.` },
-    ], { prompt: '' }, apiKey);
+    ], { prompt: '' }, apiKey, 'Image prompt');
 
     return content.trim();
   },

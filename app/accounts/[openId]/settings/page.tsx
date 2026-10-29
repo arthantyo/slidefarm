@@ -6,9 +6,13 @@ import { DashboardShell } from '@/components/dashboard/shell';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import type { PostTimes } from '@/lib/server/tiktok-post-settings';
+import { DEMO_ACCOUNT_ID, DEMO_ACCOUNT_NAME, demoAccountEnabled } from '@/lib/demo-account';
+import { readDemoTimes, writeDemoTimes } from '@/lib/demo-account-data';
 
 export default function AccountSettingsPage({ params }: { params: { openId: string } }) {
   const openId = params.openId;
+  const isDemo = openId === DEMO_ACCOUNT_ID;
+  const [demoEnabled, setDemoEnabled] = useState(false);
   const [name, setName] = useState('Account');
   const [times, setTimes] = useState<PostTimes>(['03:00', '18:00']);
   const [loading, setLoading] = useState(true);
@@ -17,6 +21,13 @@ export default function AccountSettingsPage({ params }: { params: { openId: stri
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    if (isDemo) {
+      const enabled = demoAccountEnabled();
+      setDemoEnabled(enabled);
+      if (enabled) { setName(DEMO_ACCOUNT_NAME); setTimes(readDemoTimes()); }
+      setLoading(false);
+      return;
+    }
     let active = true;
     void Promise.all([
       fetch('/api/tiktok/accounts', { cache: 'no-store' }).then((response) => response.json() as Promise<{ accounts?: { openId: string; displayName: string }[] }>),
@@ -32,11 +43,16 @@ export default function AccountSettingsPage({ params }: { params: { openId: stri
     }).catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Could not load settings.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [openId]);
+  }, [openId, isDemo]);
 
   const save = async () => {
     setBusy(true); setError(''); setSaved(false);
     try {
+      if (isDemo) {
+        writeDemoTimes(times);
+        setSaved(true);
+        return;
+      }
       const response = await fetch('/api/tiktok/post-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ openId, times }) });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error || 'Could not save posting times.');
@@ -45,8 +61,11 @@ export default function AccountSettingsPage({ params }: { params: { openId: stri
     finally { setBusy(false); }
   };
 
+  if (isDemo && !loading && !demoEnabled) return <DashboardShell><main className="mx-auto max-w-3xl px-6 py-8"><Card className="p-6">This demo account is unavailable. <Link href="/accounts" className="underline">View accounts</Link></Card></main></DashboardShell>;
+
   return <DashboardShell><main className="mx-auto max-w-3xl space-y-6 px-6 py-8">
     <div><Link href={`/accounts/${encodeURIComponent(openId)}`} className="text-sm text-muted-foreground hover:underline">← Calendar</Link><h1 className="mt-2 text-3xl font-bold">{name} settings</h1></div>
+    {isDemo && <p className="rounded-md border bg-muted/50 p-3 text-sm">Demo settings stay in this browser session. Nothing is sent to TikTok.</p>}
     <Card className="space-y-4 p-6"><div><h2 className="text-lg font-semibold">Daily posting times</h2><p className="text-sm text-muted-foreground">These times apply to new Post 1 and Post 2 slots on this account&apos;s calendar.</p></div>
       {times.map((time, slot) => <label key={slot} className="flex max-w-xs items-center justify-between gap-4 text-sm font-medium">Post {slot + 1}<input type="time" value={time} disabled={loading || busy} onChange={(event) => { const next: PostTimes = [...times]; next[slot] = event.target.value; setTimes(next); setSaved(false); }} className="h-10 rounded-md border bg-background px-3" /></label>)}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}{saved && <p role="status" className="text-sm text-muted-foreground">Posting times saved.</p>}

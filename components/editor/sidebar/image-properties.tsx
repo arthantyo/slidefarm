@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { DEFAULT_IMAGE_FILTERS, getImageFilterValues, type ImageFilters } from "@/lib/canvas/image-filters";
 import { readSavedImagePrompts, SAVED_IMAGE_PROMPTS_EVENT, SAVED_IMAGE_PROMPTS_KEY } from "@/lib/canvas/saved-image-prompts";
 import {
   Select,
@@ -21,8 +23,31 @@ interface ImagePropertiesProps {
   onUpdate: (updates: Partial<ImageElement>) => void;
 }
 
+const FILTER_PRESETS: Record<string, ImageFilters | undefined> = {
+  none: undefined,
+  grayscale: { grayscale: 100 },
+  sepia: { sepia: 100 },
+  invert: { invert: 100 },
+  vintage: { sepia: 45, saturate: 75, contrast: 110 },
+};
+
 export function ImageProperties({ element, onUpdate }: ImagePropertiesProps) {
   const [savedPrompts, setSavedPrompts] = useState<string[]>([]);
+  const filterValues = getImageFilterValues(element.filters);
+  const selectedPreset = Object.entries(FILTER_PRESETS).find(([, preset]) => {
+    const values = getImageFilterValues(preset);
+    return (Object.keys(DEFAULT_IMAGE_FILTERS) as (keyof ImageFilters)[]).every((key) => filterValues[key] === values[key]);
+  })?.[0];
+  const filterControls: { key: keyof ImageFilters; label: string; min: number; max: number; unit: string }[] = [
+    { key: 'brightness', label: 'Brightness', min: 0, max: 200, unit: '%' },
+    { key: 'contrast', label: 'Contrast', min: 0, max: 200, unit: '%' },
+    { key: 'saturate', label: 'Saturation', min: 0, max: 200, unit: '%' },
+    { key: 'grayscale', label: 'Grayscale', min: 0, max: 100, unit: '%' },
+    { key: 'sepia', label: 'Sepia', min: 0, max: 100, unit: '%' },
+    { key: 'invert', label: 'Invert', min: 0, max: 100, unit: '%' },
+    { key: 'hueRotate', label: 'Hue', min: -180, max: 180, unit: '°' },
+    { key: 'blur', label: 'Blur', min: 0, max: 20, unit: 'px' },
+  ];
 
   useEffect(() => {
     const refresh = () => setSavedPrompts(readSavedImagePrompts());
@@ -70,6 +95,44 @@ export function ImageProperties({ element, onUpdate }: ImagePropertiesProps) {
           max={100}
           step={1}
         />
+      </div>
+
+      <div className="space-y-3 border-t border-border pt-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-semibold">Image filters</Label>
+          <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => onUpdate({ filters: undefined })}>
+            Reset
+          </Button>
+        </div>
+        <Select value={selectedPreset ?? ''} onValueChange={(preset) => onUpdate({ filters: FILTER_PRESETS[preset] })}>
+          <SelectTrigger className="h-8 text-xs" aria-label="Apply image filter preset">
+            <SelectValue placeholder="Apply preset" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            <SelectItem value="grayscale">Grayscale</SelectItem>
+            <SelectItem value="sepia">Sepia</SelectItem>
+            <SelectItem value="invert">Invert</SelectItem>
+            <SelectItem value="vintage">Vintage</SelectItem>
+          </SelectContent>
+        </Select>
+        {filterControls.map(({ key, label, min, max, unit }) => (
+          <div key={key} className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <Label htmlFor={`image-filter-${key}-${element.id}`} className="text-xs">{label}</Label>
+              <span className="tabular-nums text-muted-foreground">{filterValues[key]}{unit}</span>
+            </div>
+            <Slider
+              id={`image-filter-${key}-${element.id}`}
+              aria-label={label}
+              value={[filterValues[key]]}
+              min={min}
+              max={max}
+              step={1}
+              onValueChange={([value]) => onUpdate({ filters: { ...element.filters, [key]: value } })}
+            />
+          </div>
+        ))}
       </div>
 
       {/* Replace URL */}

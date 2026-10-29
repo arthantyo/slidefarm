@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import type { ImageElement } from '@/types';
 import { ImageIcon } from 'lucide-react';
+import { getImageFilterCss } from '@/lib/canvas/image-filters';
 
 interface ImageRendererProps {
   element: ImageElement;
@@ -46,6 +47,7 @@ export function ImageRenderer({ element }: ImageRendererProps) {
         className="h-full w-full select-none"
         style={{
           objectFit: element.objectFit,
+          filter: getImageFilterCss(element.filters),
           pointerEvents: 'none',
         }}
       />

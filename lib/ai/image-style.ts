@@ -5,7 +5,7 @@ export async function describeImageStyle(imageUrl: string, apiKey: string): Prom
   if (!/^data:image\/[a-z0-9.+-]+;base64,/i.test(imageUrl) && !/^https:\/\//i.test(imageUrl)) {
     throw new Error('The original image must be a saved image or an HTTPS URL to match its style.');
   }
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await trackedOpenAiFetch('Image style analysis', 'text', 'https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -26,3 +26,4 @@ export async function describeImageStyle(imageUrl: string, apiKey: string): Prom
   if (!style) throw new Error('Could not determine the original image style.');
   return style;
 }
+import { trackedOpenAiFetch } from '@/lib/server/ai-usage';

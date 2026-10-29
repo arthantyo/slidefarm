@@ -4,6 +4,7 @@ import { memo } from 'react';
 import type { Slide, Theme, CanvasElement, BackgroundElement, TextElement, ShapeElement, ImageElement } from '@/types';
 import { getTextFontWeight, isTextItalic } from '@/lib/canvas/text-style';
 import { elementsInLayerOrder } from '@/lib/canvas/layers';
+import { getImageFilterCss } from '@/lib/canvas/image-filters';
 
 interface SlideThumbnailProps {
   slide: Slide;
@@ -100,6 +101,7 @@ function renderElement(el: CanvasElement, key: string, scale: number): React.Rea
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
           borderRadius: img.cornerRadius * scale,
+          filter: getImageFilterCss(img.filters),
         }}
       />
     );

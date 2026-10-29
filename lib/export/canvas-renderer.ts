@@ -9,6 +9,7 @@ import type {
 import { getWrappedLines } from "./text-wrap";
 import { loadFont } from "../font-loader";
 import { getTextFontWeight, isTextItalic } from "../canvas/text-style";
+import { getImageFilterCss } from "../canvas/image-filters";
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -213,6 +214,7 @@ function renderImageElement(
   if (!img) return;
 
   ctx.save();
+  ctx.filter = getImageFilterCss(el.filters);
   if (el.cornerRadius > 0) {
     ctx.beginPath();
     ctx.roundRect(el.x, el.y, el.width, el.height, el.cornerRadius);
