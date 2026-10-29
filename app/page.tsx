@@ -16,6 +16,7 @@ import {
 } from "@/lib/canvas/template-filler";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { DashboardOverview } from "@/components/dashboard/overview";
+import { OnboardingDialog } from "@/components/dashboard/onboarding-dialog";
 import { ProjectSection } from "@/components/dashboard/project-section";
 import { ManagementDialogs } from "@/components/dashboard/management-dialogs";
 import { TemplateGallery } from "@/components/dashboard/template-gallery";
@@ -25,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Clock, LayoutGrid } from "lucide-react";
 
 const PROJECT_VIEW_KEY = "slidefarm-project-view";
+const ONBOARDING_SEEN_KEY = "slidefarm-onboarding-seen";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -53,6 +55,8 @@ export default function DashboardPage() {
     (state) => state.storageError,
   );
   const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const onboardingChecked = useRef(false);
   const [remixProject, setRemixProject] = useState<Project | null>(null);
   const [remixingSource, setRemixingSource] = useState<Project | null>(null);
   const [remixJobError, setRemixJobError] = useState('');
@@ -78,6 +82,27 @@ export default function DashboardPage() {
   useEffect(() => {
     loadCustomTemplates();
   }, [loadCustomTemplates]);
+
+  useEffect(() => {
+    if (!loaded || onboardingChecked.current) return;
+    onboardingChecked.current = true;
+    if (storageError || projects.length > 0) return;
+    try {
+      if (localStorage.getItem(ONBOARDING_SEEN_KEY)) return;
+    } catch {
+      // The guide can still be shown if browser storage is unavailable.
+    }
+    setOnboardingOpen(true);
+  }, [loaded, projects.length, storageError]);
+
+  const closeOnboarding = () => {
+    setOnboardingOpen(false);
+    try {
+      localStorage.setItem(ONBOARDING_SEEN_KEY, "true");
+    } catch {
+      // Keep the guide usable even when browser storage is unavailable.
+    }
+  };
 
   useEffect(() => {
     if (!loaded) return;
@@ -231,6 +256,7 @@ export default function DashboardPage() {
           onGenerate={() => setGeneratorOpen(true)}
           onCreateBlank={handleCreateBlank}
           onBrowseTemplates={() => setActiveTab("templates")}
+          onOpenOnboarding={() => setOnboardingOpen(true)}
         />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -319,6 +345,8 @@ export default function DashboardPage() {
         </Tabs>
       </main>
       </DashboardShell>
+
+      <OnboardingDialog open={onboardingOpen} onClose={closeOnboarding} />
 
       <GeneratorDialog
         open={generatorOpen}

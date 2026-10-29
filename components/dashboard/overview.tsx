@@ -1,7 +1,6 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { LayoutGrid, Plus, Sparkles, Users } from "lucide-react";
 import Cloudscape from "../shaders/cloudscape";
 
@@ -10,6 +9,7 @@ interface DashboardOverviewProps {
   onGenerate: () => void;
   onCreateBlank: () => void;
   onBrowseTemplates: () => void;
+  onOpenOnboarding: () => void;
 }
 
 export function DashboardOverview({
@@ -17,6 +17,7 @@ export function DashboardOverview({
   onGenerate,
   onCreateBlank,
   onBrowseTemplates,
+  onOpenOnboarding,
 }: DashboardOverviewProps) {
   const actions = [
     { label: "Generate with AI", icon: Sparkles, action: onGenerate },
@@ -27,7 +28,19 @@ export function DashboardOverview({
 
   return (
     <>
-      <Cloudscape className="mb-10 rounded-2xl border border-border bg-black p-8">
+      <Cloudscape
+        className="mb-10 cursor-pointer rounded-2xl border border-border bg-black p-8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        role="button"
+        tabIndex={0}
+        aria-label="Show intro"
+        onClick={onOpenOnboarding}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onOpenOnboarding();
+          }
+        }}
+      >
         <div className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
           <div className="space-y-3">
             <h1 className="text-3xl font-bold text-white tracking-tight md:text-4xl">
