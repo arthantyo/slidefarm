@@ -25,7 +25,11 @@ export default function EditorPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.projectId as string;
-  const { project, currentSlideId, selectedElementIds, zoom, loadProject } = useEditorStore();
+  const project = useEditorStore((state) => state.project);
+  const currentSlideId = useEditorStore((state) => state.currentSlideId);
+  const selectedElementIds = useEditorStore((state) => state.selectedElementIds);
+  const zoom = useEditorStore((state) => state.zoom);
+  const loadProject = useEditorStore((state) => state.loadProject);
   const getProject = useProjectStore((s) => s.get);
   const load = useProjectStore((s) => s.load);
   const loaded = useProjectStore((s) => s.loaded);
