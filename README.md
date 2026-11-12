@@ -170,6 +170,8 @@ npm run test:integration
 
 `npm run desktop:build` creates a production build and a platform installer in `dist/`.
 
+On Windows, uninstall SlideFarm from **Settings > Apps > Installed apps** or the **Uninstall SlideFarm** Start menu shortcut. Uninstalling leaves your local projects and settings in `%APPDATA%\SlideFarm` so they can be used after reinstalling.
+
 ### Desktop CI and releases
 
 The [desktop workflow](.github/workflows/desktop-release.yml) checks TypeScript and lint, then builds the Next.js standalone server, runs HTTP integration checks, and packages Windows x64 (NSIS), macOS Intel (DMG), and Linux x64 (AppImage) on their native runners. Pull requests and pushes to `main` produce downloadable Actions artifacts. Push a tag matching the version in both `package.json` and `electron/package.json` (for example, `v0.1.0`) to publish those installers and a `SHA256SUMS.txt` file to GitHub Releases. The repository's Actions settings must allow the workflow's `GITHUB_TOKEN` to create releases.

@@ -14,7 +14,8 @@
 /out/
 
 # production
-/build
+/build/*
+!/build/installer.nsh
 /dist
 
 # misc

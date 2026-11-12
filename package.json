@@ -157,6 +157,11 @@
       "target": "nsis",
       "icon": "app/assets/icon-windows.ico"
     },
+    "nsis": {
+      "include": "build/installer.nsh",
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false
+    },
     "mac": {
       "target": "dmg",
       "icon": "app/assets/icon-mac.icns"
