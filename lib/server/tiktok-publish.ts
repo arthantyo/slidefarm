@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { accessToken } from './tiktok';
+import { readR2Settings } from './r2-settings';
 
 export const photoPostSchema = z.object({
   openId: z.string().min(1), title: z.string().max(90), description: z.string().max(4000),
@@ -10,13 +11,17 @@ export const photoPostSchema = z.object({
 export type PhotoPost = z.infer<typeof photoPostSchema>;
 export type PhotoPostMode = 'DIRECT_POST' | 'MEDIA_UPLOAD';
 
-export function validatePhotoUrls(images: string[]) {
-  const prefix = process.env.TIKTOK_VERIFIED_URL_PREFIX;
-  if (!prefix?.startsWith('https://')) throw new Error('Set TIKTOK_VERIFIED_URL_PREFIX to the verified public HTTPS origin.');
-  const verified = new URL(prefix);
+export async function validatePhotoUrls(images: string[]) {
+  const { publicOrigin } = await readR2Settings();
+  let verified: URL;
+  try { verified = new URL(publicOrigin); }
+  catch { throw new Error('Configure the verified public HTTPS origin in Settings → Cloudflare R2 or TIKTOK_VERIFIED_URL_PREFIX.'); }
+  if (verified.protocol !== 'https:' || verified.pathname !== '/' || verified.search || verified.hash || verified.username || verified.password) {
+    throw new Error('Configure the verified public HTTPS origin in Settings → Cloudflare R2 or TIKTOK_VERIFIED_URL_PREFIX.');
+  }
   if (images.some((image) => {
     const url = new URL(image);
-    return url.protocol !== 'https:' || url.origin !== verified.origin || !url.pathname.startsWith(verified.pathname) || Boolean(url.username || url.password);
+    return url.protocol !== 'https:' || url.origin !== verified.origin || Boolean(url.username || url.password);
   })) throw new Error('All images must use the verified URL prefix.');
 }
 
@@ -51,7 +56,7 @@ async function tiktokRequest<T>(path: string, token: string, body?: unknown, mod
 }
 
 export async function publishPhotoPost(post: PhotoPost, mode: PhotoPostMode = 'DIRECT_POST'): Promise<string> {
-  validatePhotoUrls(post.images);
+  await validatePhotoUrls(post.images);
   const token = await accessToken(post.openId);
   const creator = mode === 'DIRECT_POST'
     ? await tiktokRequest<{ privacy_level_options?: string[]; comment_disabled?: boolean }>('creator_info/query/', token)

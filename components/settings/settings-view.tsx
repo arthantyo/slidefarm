@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { KeyRound, Palette, Pin, Sparkles, Video } from 'lucide-react';
+import { Cloud, KeyRound, Palette, Pin, Sparkles, Video } from 'lucide-react';
 import { DashboardShell } from '@/components/dashboard/shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,15 +11,32 @@ import { getUserApiKey, removeUserApiKey, saveUserApiKey } from '@/lib/ai/user-k
 import { useTheme } from '@/components/theme-provider';
 import { cn } from '@/lib/utils';
 
-type SettingsSection = 'appearance' | 'openai' | 'image-model' | 'tiktok' | 'pinterest';
+type SettingsSection = 'appearance' | 'openai' | 'image-model' | 'tiktok' | 'r2' | 'pinterest';
 
 const settingsSections: { id: SettingsSection; label: string; description: string; icon: typeof Palette }[] = [
   { id: 'appearance', label: 'Appearance', description: 'Choose how SlideFarm looks on this device.', icon: Palette },
   { id: 'openai', label: 'OpenAI', description: 'SlideFarm uses the OpenAI API for slide generation, remixing, images, text rewriting, and captions. You need an OpenAI API key from the API Platform. A ChatGPT login or subscription is not an API key.', icon: KeyRound },
   { id: 'image-model', label: 'Image model', description: 'Choose the OpenAI image model used for new images, remixes, and workflow image generation.', icon: Sparkles },
   { id: 'tiktok', label: 'TikTok', description: 'Enter your TikTok app client key, client secret, and registered redirect URI to connect accounts. These settings are saved on the local server.', icon: Video },
+  { id: 'r2', label: 'Cloudflare R2', description: 'Configure the R2 bucket used to host TikTok photo slides. Credentials are saved on the local server.', icon: Cloud },
   { id: 'pinterest', label: 'Pinterest', description: 'Use Apify\'s epctex/pinterest-scraper Actor to search pins and import board images. Your API token is saved on the local server.', icon: Pin },
 ];
+
+type R2SettingsForm = {
+  accountId: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  publicOrigin: string;
+  hasAccessKey: boolean;
+  hasSecret: boolean;
+  configured: boolean;
+};
+
+const emptyR2Settings: R2SettingsForm = {
+  accountId: '', bucket: '', accessKeyId: '', secretAccessKey: '', publicOrigin: '',
+  hasAccessKey: false, hasSecret: false, configured: false,
+};
 
 function sectionHref(id: SettingsSection) {
   return id === 'appearance' ? '/settings' : `/settings?section=${id}`;
@@ -41,6 +58,9 @@ export function SettingsView({ section }: { section?: string }) {
   const [tiktok, setTikTok] = useState({ clientKey: '', clientSecret: '', hasSecret: false, redirectUri: '' });
   const [tiktokMessage, setTikTokMessage] = useState('');
   const [savingTikTok, setSavingTikTok] = useState(false);
+  const [r2, setR2] = useState<R2SettingsForm>(emptyR2Settings);
+  const [r2Message, setR2Message] = useState('');
+  const [savingR2, setSavingR2] = useState(false);
 
   useEffect(() => { setSaved(Boolean(getUserApiKey())); }, []);
   useEffect(() => {
@@ -63,6 +83,12 @@ export function SettingsView({ section }: { section?: string }) {
       .then(async (response) => { const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Could not load TikTok settings.'); return result; })
       .then((result) => setTikTok((current) => ({ ...current, ...result })))
       .catch((error) => setTikTokMessage(error instanceof Error ? error.message : 'Could not load TikTok settings.'));
+  }, []);
+  useEffect(() => {
+    void fetch('/api/settings/r2', { cache: 'no-store' })
+      .then(async (response) => { const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Could not load R2 settings.'); return result; })
+      .then((result) => setR2((current) => ({ ...current, ...result })))
+      .catch((error) => setR2Message(error instanceof Error ? error.message : 'Could not load R2 settings.'));
   }, []);
 
   async function saveTikTok(event: React.FormEvent<HTMLFormElement>) {
@@ -88,6 +114,41 @@ export function SettingsView({ section }: { section?: string }) {
       setPinterestMessage(removeToken ? 'Apify token removed.' : 'Pinterest settings saved.');
     } catch (error) { setPinterestMessage(error instanceof Error ? error.message : 'Could not save Pinterest settings.'); }
     finally { setSavingPinterest(false); }
+  }
+
+  async function saveR2(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSavingR2(true); setR2Message('');
+    try {
+      const response = await fetch('/api/settings/r2', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: r2.accountId,
+          bucket: r2.bucket,
+          accessKeyId: r2.accessKeyId,
+          secretAccessKey: r2.secretAccessKey,
+          publicOrigin: r2.publicOrigin,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not save R2 settings.');
+      setR2({ ...emptyR2Settings, ...result });
+      setR2Message('R2 settings saved on this device.');
+    } catch (error) { setR2Message(error instanceof Error ? error.message : 'Could not save R2 settings.'); }
+    finally { setSavingR2(false); }
+  }
+
+  async function resetR2() {
+    setSavingR2(true); setR2Message('');
+    try {
+      const response = await fetch('/api/settings/r2', { method: 'DELETE' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not reset R2 settings.');
+      setR2({ ...emptyR2Settings, ...result });
+      setR2Message('Local R2 settings removed. Environment variables remain active if configured.');
+    } catch (error) { setR2Message(error instanceof Error ? error.message : 'Could not reset R2 settings.'); }
+    finally { setSavingR2(false); }
   }
 
   async function saveImageModel(event: React.FormEvent<HTMLFormElement>) {
@@ -177,6 +238,27 @@ export function SettingsView({ section }: { section?: string }) {
             <Button type="submit" disabled={savingTikTok}>{savingTikTok ? 'Saving.' : 'Save TikTok settings'}</Button>
           </form>
           {tiktokMessage && <p role="status" className="mt-3 text-sm">{tiktokMessage}</p>}
+        </section>}
+        {current.id === 'r2' && <section className="mt-8 rounded-xl border border-border bg-card p-6">
+          <form onSubmit={saveR2} className="space-y-3">
+            <Label htmlFor="r2-account-id">Cloudflare account ID</Label>
+            <Input id="r2-account-id" autoComplete="off" spellCheck={false} value={r2.accountId} onChange={(event) => setR2({ ...r2, accountId: event.target.value })} />
+            <Label htmlFor="r2-bucket">Bucket name</Label>
+            <Input id="r2-bucket" autoComplete="off" spellCheck={false} value={r2.bucket} onChange={(event) => setR2({ ...r2, bucket: event.target.value })} />
+            <Label htmlFor="r2-access-key-id">R2 access key ID</Label>
+            <Input id="r2-access-key-id" autoComplete="off" spellCheck={false} value={r2.accessKeyId} onChange={(event) => setR2({ ...r2, accessKeyId: event.target.value })} placeholder={r2.hasAccessKey ? 'Key saved - enter a new one to replace it' : 'Enter your R2 access key ID'} />
+            <Label htmlFor="r2-secret-access-key">R2 secret access key</Label>
+            <Input id="r2-secret-access-key" type="password" autoComplete="new-password" spellCheck={false} value={r2.secretAccessKey} onChange={(event) => setR2({ ...r2, secretAccessKey: event.target.value })} placeholder={r2.hasSecret ? 'Secret saved - enter a new one to replace it' : 'Enter your R2 secret access key'} />
+            <p className="text-xs text-muted-foreground">Status: {r2.configured ? 'Configured' : 'Incomplete'}{r2.hasAccessKey && r2.hasSecret ? ' · Credentials saved' : ''}</p>
+            <Label htmlFor="r2-public-origin">Public HTTPS origin</Label>
+            <Input id="r2-public-origin" type="url" autoComplete="url" spellCheck={false} value={r2.publicOrigin} onChange={(event) => setR2({ ...r2, publicOrigin: event.target.value })} placeholder="https://slides.your-domain.example" />
+            <p className="text-xs text-muted-foreground">Use the bucket&apos;s public custom-domain origin verified in your TikTok developer app. Do not include a path.</p>
+            <div className="flex gap-3">
+              <Button type="submit" disabled={savingR2}>{savingR2 ? 'Saving…' : 'Save R2 settings'}</Button>
+              <Button type="button" variant="outline" disabled={savingR2} onClick={() => void resetR2()}>Reset to environment variables</Button>
+            </div>
+          </form>
+          {r2Message && <p role="status" className="mt-3 text-sm">{r2Message}</p>}
         </section>}
         {current.id === 'pinterest' && <section className="mt-8 rounded-xl border border-border bg-card p-6">
           <form onSubmit={(event) => { event.preventDefault(); void savePinterest(); }} className="space-y-3">

@@ -130,9 +130,10 @@ Settings has its own section list. Appearance is the default. On a narrow window
 | OpenAI | The API key described above |
 | Image model | The OpenAI image model, saved on the local server |
 | TikTok | Client key, client secret, and redirect URI, saved on the local server |
+| Cloudflare R2 | Bucket credentials and public origin for TikTok slide hosting, saved on the local server |
 | Pinterest | Apify API token for the `epctex/pinterest-scraper` Actor, saved on the local server |
 
-Saved TikTok and Pinterest values are used when present. Otherwise SlideFarm reads the matching environment variables. An unknown settings section opens Appearance.
+Saved TikTok, R2, and Pinterest values are used when present. Otherwise SlideFarm reads the matching environment variables. The settings APIs are restricted to localhost; production deployments should configure these values as environment variables. An unknown settings section opens Appearance.
 
 ## TikTok sandbox (optional)
 
@@ -151,7 +152,7 @@ TIKTOK_VERIFIED_URL_PREFIX=https://slides.your-domain.example
 
 For a local server, an HTTPS tunnel can forward the web callback to `/api/tiktok/callback`; account management stays on localhost. For Desktop Login Kit, register a fixed callback such as `http://127.0.0.1:3000/api/tiktok/callback` in TikTok and enter that exact URI in Settings. SlideFarm listens on that callback port while its app server uses an available port, opens TikTok in the default browser, and returns the result to the desktop app through the `slidefarm://` link. The callback port must be free. Your browser may ask to open SlideFarm after authorization. SlideFarm uses PKCE for this flow. To upload to the TikTok inbox, enable `video.upload` and reconnect the account.
 
-Create an R2 bucket and an API token with object write access. Connect the bucket to a public custom domain, verify that domain for Content Posting in the TikTok sandbox, and set `TIKTOK_VERIFIED_URL_PREFIX` to its HTTPS origin. SlideFarm uploads slides to `tiktok/slides/*.png` and passes the public URLs to TikTok.
+Create an R2 bucket and an API token with object write access. Connect the bucket to a public custom domain and verify that domain for Content Posting in the TikTok sandbox. Enter the bucket credentials and public HTTPS origin under **Settings → Cloudflare R2**, or set the corresponding environment variables. SlideFarm uploads slides to `tiktok/slides/*.jpg` and passes the public URLs to TikTok.
 
 Each connected profile has its own calendar. Scheduling exports the slides to R2 immediately; the local SlideFarm server submits the post at the chosen time. Keep the server running for scheduled posts and reopen the calendar after restarting it. If you configure an R2 lifecycle rule, retain the files until TikTok has fetched them. Connected account tokens stay in the local data directory. Sandbox posting is limited to accounts allowed in your TikTok sandbox.
 

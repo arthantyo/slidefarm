@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     const draft = parsed.data;
     const account = (await readAccounts()).find((item) => item.openId === draft.openId);
     if (!account?.scopes.includes('video.upload')) return NextResponse.json({ error: 'Reconnect this TikTok account to grant video.upload access.' }, { status: 403 });
-    validatePhotoUrls(draft.images);
+    await validatePhotoUrls(draft.images);
     const publishId = await publishPhotoPost({
       ...draft,
       privacyLevel: 'SELF_ONLY', disableComment: true, autoAddMusic: false,

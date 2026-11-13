@@ -1,4 +1,5 @@
 import { createHash, createHmac } from 'node:crypto';
+import { readR2Settings, validateR2Settings } from './r2-settings';
 
 interface R2Config {
   endpoint: string;
@@ -8,32 +9,24 @@ interface R2Config {
   publicOrigin: string;
 }
 
-function config(): R2Config {
-  const accountId = process.env.R2_ACCOUNT_ID;
-  const bucket = process.env.R2_BUCKET;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-  const publicUrl = process.env.TIKTOK_VERIFIED_URL_PREFIX;
-  if (!accountId || !bucket || !accessKeyId || !secretAccessKey || !publicUrl) {
-    throw new Error('Configure R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and TIKTOK_VERIFIED_URL_PREFIX.');
-  }
-  if (!/^[a-f0-9]{32}$/i.test(accountId) || !/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(bucket)) {
-    throw new Error('Invalid R2 account ID or bucket name.');
-  }
-  let url: URL;
-  try { url = new URL(publicUrl); }
-  catch { throw new Error('TIKTOK_VERIFIED_URL_PREFIX must be the public HTTPS origin of your R2 bucket.'); }
-  if (url.protocol !== 'https:' || url.pathname !== '/' || url.search || url.hash || url.username || url.password) {
-    throw new Error('TIKTOK_VERIFIED_URL_PREFIX must be the public HTTPS origin of your R2 bucket.');
-  }
-  return { endpoint: `https://${accountId}.r2.cloudflarestorage.com`, bucket, accessKeyId, secretAccessKey, publicOrigin: url.origin };
+async function config(): Promise<R2Config> {
+  const settings = await readR2Settings();
+  const error = validateR2Settings(settings);
+  if (error) throw new Error(error);
+  return {
+    endpoint: `https://${settings.accountId}.r2.cloudflarestorage.com`,
+    bucket: settings.bucket,
+    accessKeyId: settings.accessKeyId,
+    secretAccessKey: settings.secretAccessKey,
+    publicOrigin: new URL(settings.publicOrigin).origin,
+  };
 }
 
 const sha256 = (data: Buffer | string) => createHash('sha256').update(data).digest('hex');
 const hmac = (key: Buffer | string, data: string) => createHmac('sha256', key).update(data).digest();
 
 export async function uploadTikTokSlide(key: string, body: Buffer): Promise<string> {
-  const settings = config();
+  const settings = await config();
   if (!/^tiktok\/slides\/[a-f0-9-]{36}\.jpg$/.test(key)) throw new Error('Invalid R2 object key.');
   const endpoint = new URL(settings.endpoint);
   const path = `/${settings.bucket}/${key}`;

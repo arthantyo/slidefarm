@@ -61,7 +61,7 @@ export async function listScheduledPosts(openId?: string): Promise<ScheduledPost
 
 async function validateInput(input: ScheduleInput) {
   if (input.scheduledAt < Date.now() - 60_000) throw new Error('Choose a future date and time.');
-  validatePhotoUrls(input.images);
+  await validatePhotoUrls(input.images);
   if (input.postMode !== 'MEDIA_UPLOAD' && input.brandContent && input.privacyLevel === 'SELF_ONLY') throw new Error('Branded content cannot be private.');
   const account = (await readAccounts()).find((item) => item.openId === input.openId);
   const scope = input.postMode === 'MEDIA_UPLOAD' ? 'video.upload' : 'video.publish';
